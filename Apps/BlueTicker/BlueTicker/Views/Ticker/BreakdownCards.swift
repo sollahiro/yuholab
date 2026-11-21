@@ -61,8 +61,8 @@ struct BreakdownModel {
                 rows: BreakdownSummary.segmentRows(columns: columns, layout: layout, profitByKey: profitByKey))
         }
 
-        // 地域（年ごと）は利益を待たずに始める。
-        async let regionResponses = loadRegionResponses(code: code, waterfall: waterfall)
+        // 地域は利益を待たずに始める。年次推移の API（地域名を正規化済み）が取れなければ、年ごとの内訳から組む。
+        async let regionWaterfall = try? APIClient.shared.geographyWaterfall(code: code, years: years)
 
         // 1 段目: 棒と、利益なしの表。
         await update(BreakdownModel(segment: segmentModel([:]), region: nil))
@@ -78,7 +78,18 @@ struct BreakdownModel {
 
         // 3 段目: 地域。
         let geographic = detailRows.contains { $0.segmentBasis == "geographic" }
-        let region = geographic ? nil : regionModel(waterfall: waterfall, responses: await regionResponses)
+        var region: RegionCardModel?
+        if !geographic {
+            if let response = await regionWaterfall,
+                let model = regionModel(
+                    columns: BreakdownBuilder.geographyColumns(response) { Format.fy($0.fyEnd) })
+            {
+                region = model
+            } else {
+                let responses = await loadRegionResponses(code: code, waterfall: waterfall)
+                region = regionModel(waterfall: waterfall, responses: responses)
+            }
+        }
         await update(BreakdownModel(segment: segment, region: region))
     }
 
@@ -110,6 +121,10 @@ struct BreakdownModel {
                 label: Format.fy(year.fyEnd), previousLabels: previous, response: response)
             if !column.items.isEmpty { columns.append(column) }
         }
+        return regionModel(columns: columns)
+    }
+
+    private static func regionModel(columns: [BreakdownColumnInput]) -> RegionCardModel? {
         guard let latest = columns.last, latest.items.count >= 2 else { return nil }
         let layout = StackedLayout.make(columns: columns)
         return RegionCardModel(
@@ -267,8 +282,8 @@ enum BreakdownPalette {
         switch mark {
         case .none: return nil
         case .reorg: return "再編"
-        case .new: return "新規"
-        case .ended: return "終了"
+        // 「新規」「終了」は断定しない（地域名の表記ゆれや再編で出がち）ので棒の中には出さない。
+        case .new, .ended: return nil
         }
     }
 }
@@ -299,7 +314,9 @@ private struct StackedBarChart: View {
     var accessibilityText: String
 
     private let chartHeight: CGFloat = 220
-    private let labelBand: CGFloat = 22
+    private let baseLabelBand: CGFloat = 22
+    /// 年ラベルの下に「再編」を出す年があるときだけ、下の余白を広げる。
+    private var labelBand: CGFloat { layout.columnReorged.contains(true) ? baseLabelBand + 12 : baseLabelBand }
     /// 縦軸の文字を置く左の余白。
     private let axisInset: CGFloat = 40
 
@@ -373,7 +390,13 @@ private struct StackedBarChart: View {
                 context.draw(
                     context.resolve(
                         Text(layout.columnLabels[index]).font(.caption2).foregroundStyle(Theme.textMuted)),
-                    at: CGPoint(x: x(center), y: plotHeight + labelBand / 2 + 2), anchor: .center)
+                    at: CGPoint(x: x(center), y: plotHeight + baseLabelBand / 2 + 2), anchor: .center)
+                if index < layout.columnReorged.count, layout.columnReorged[index] {
+                    context.draw(
+                        context.resolve(
+                            Text("再編").font(.system(size: 9, weight: .medium)).foregroundStyle(Theme.textMuted.opacity(0.8))),
+                        at: CGPoint(x: x(center), y: plotHeight + baseLabelBand + 6), anchor: .center)
+                }
                 let top = layout.bars[index].map(\.y).min() ?? 1
                 context.draw(
                     context.resolve(
