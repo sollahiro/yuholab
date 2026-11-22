@@ -656,7 +656,7 @@ extension BreakdownLoadResult {
         try await withMigratedApp { app in
             try await seedDoc("S1", secCode: "72030", db: app.db)
             try await seedDoc("S2", secCode: "67580", db: app.db)
-            let sets = FilingSectionCandidateSets(
+            let sets = AnnualReportCandidateSets(
                 keep: [FilingDocCandidate(docID: "S1", code: "7203", submitDateTime: "2025-06-20 09:00")],
                 purge: [])
 

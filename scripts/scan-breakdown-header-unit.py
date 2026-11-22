@@ -286,9 +286,8 @@ FROM (
       SELECT max((r->>'amount')::double precision)
       FROM jsonb_array_elements(COALESCE(b.payload->'rows', '[]'::jsonb)) r
     ) AS max_amount,
-    f.payload AS filing_payload
+    NULL::jsonb AS filing_payload  -- company_filing_sections は廃止済み
   FROM company_breakdowns b
-  LEFT JOIN company_filing_sections f ON f.doc_id = b.doc_id
   WHERE b.source IN ('revenue_recognition_llm', 'segment_info_llm', 'geography_llm')
   ORDER BY b.code, b.doc_id, b.source
 ) t;

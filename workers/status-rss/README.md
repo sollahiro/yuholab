@@ -15,7 +15,6 @@ Cron が 1 日 1 回 Neon を読み、RSS XML を R2 の静的オブジェクト
 |---|---|
 | 財務サマリー | `company_financials` |
 | 財務諸表 | `company_statements` |
-| 有報の文章 | `company_filing_sections` |
 | 内訳 | `company_breakdowns` |
 | 業種KPI | `industry_kpi_facts` |
 

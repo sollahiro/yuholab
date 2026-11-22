@@ -30,16 +30,6 @@ import Testing
         #expect(q.required == false)
     }
 
-    @Test func filingContentSectionsIsCommaSeparatedString() throws {
-        let skill = try #require(apiSkill(id: "get-filing-content"))
-        let sections = try #require(skill.parameters.first { $0.name == "sections" })
-        #expect(sections.type == .string)
-        let detail = apiSkillDetailJSON(skill)
-        let parameters = try #require(detail["parameters"] as? [[String: Any]])
-        let sectionsJSON = try #require(parameters.first { $0["name"] as? String == "sections" })
-        #expect(sectionsJSON["type"] as? String == "string")
-    }
-
     @Test func listAndDetailJSONIncludeSchemaVersion() throws {
         let list = apiSkillsListJSON()
         #expect(list["schema_version"] as? Int == apiSkillsSchemaVersion)
@@ -99,7 +89,7 @@ import Testing
         #expect(!skill.description.contains("axis=business"))
         #expect(skill.description.contains("needs_review"))
         #expect(skill.description.contains("interest_bearing_debt_lease_denominator_from_notes"))
-        #expect(apiSkillsSchemaVersion == 19)
+        #expect(apiSkillsSchemaVersion == 20)
         let waterfall = try #require(apiSkill(id: "get-segment-waterfall"))
         #expect(waterfall.path == "/v1/companies/{code}/waterfall/segment")
         #expect(waterfall.parameters.contains { $0.name == "years" })

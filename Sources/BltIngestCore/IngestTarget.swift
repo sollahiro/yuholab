@@ -8,8 +8,6 @@ import BlueTickerCore
 public enum IngestTarget: String, CaseIterable, Sendable {
     /// 通期財務サマリ（company_financials）。
     case financials
-    /// 有報セクション本文（company_filing_sections）。
-    case filingSections = "filing-sections"
     /// 事業別・地域別内訳・決定論指標軸（company_breakdowns）。ingest は product_service→geography→...。
     /// 対象は上場全体（日経225は処理順の優先のみ）。REST/MCP read は全軸公開。
     case breakdowns

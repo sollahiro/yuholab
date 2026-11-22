@@ -64,7 +64,7 @@ package func registerBltMigrations(_ migrations: Migrations) {
     migrations.add(AddAssemblyFingerprintToCompanyFinancials())
     // 財務取り込み: Summary sga の Jev 監査（公開 response には出さない）。
     migrations.add(AddLlmAuditToCompanyFinancials())
-    // 有報セクション取り込み: 有報セクション本文（company_filing_sections、書類単位 JSONB）。
+    // 廃止済み（filing-sections）。適用履歴と後続の索引 migration のため登録は残す。テーブルの DROP は別途。
     migrations.add(CreateCompanyFilingSections())
     // EDINET マスタデータ（コードリスト CSV）の正本スナップショット（単一行）。
     migrations.add(CreateEdinetMasterSnapshot())

@@ -7,6 +7,7 @@ import Foundation
 
 /// REST skills 応答の `schema_version`。形を破壊的に変えたときのみ +1。
 /// v9（2026-10-26）: 金額を基本単位（円・ドル）へ統一し、financials / waterfall に `units` / `currency` を載せた。
+/// v20（2026-11-22）: get-filing-content（`GET /filing-content`）を廃止した（breaking。404）。
 /// v19（2026-11-17）: breakdown の axis `product_service` を廃止した（breaking。常に 404）。
 /// v18（2026-11-16）: relations は関連会社・その他の関係会社を返さない（親会社・子会社・顧客・出資先・大株主だけ。
 /// `type=group` は parent / subsidiary、`type=affiliate` は空）。
@@ -23,7 +24,7 @@ import Foundation
 /// `GET /waterfall/segment` を追加。
 /// v16（2026-11-12）: 報告セグメント年次は `GET /waterfall/segment` 1 本。つなぎは years[] に載せ、
 /// `/waterfall/segment/transitions` は置かない。years（既定 5）と fiscal_year（単年）。
-public let apiSkillsSchemaVersion = 19
+public let apiSkillsSchemaVersion = 20
 
 /// パラメータの置き場所（REST パス変数 / クエリ）。
 public enum ApiSkillParameterLocation: String, Sendable {
@@ -215,7 +216,7 @@ public func apiSkillsCatalog() -> [ApiSkill] {
                 ),
             ],
             instructions: """
-                有報・半期などの doc_id を知るときに使う。filing-content / breakdown の doc_id 指定の前段。
+                有報・半期などの doc_id を知るときに使う。breakdown などの doc_id 指定の前段。
                 DB 同期済みなら DB から返し、未同期銘柄のみライブ EDINET 探索へフォールバックする。
                 例: GET /v1/companies/6103/filings?max_years=5
                 """
@@ -321,48 +322,6 @@ public func apiSkillsCatalog() -> [ApiSkill] {
                 Waterfall（Summary + 前年差・要因分解）。水準値だけなら get-financials で足りる。
                 格納済みデータのみ。未集計は 404、DB 非接続は 503。
                 例: GET /v1/companies/6103/waterfall?years=5
-                """
-        ),
-        ApiSkill(
-            id: "get-filing-content",
-            name: "有報セクション本文",
-            description: """
-                EDINET 書類からセクションテキストを抽出します（格納済みデータのみ）。
-                doc_id を省略すると最新の有価証券報告書を使用します。
-                sections を省略すると全セクションを返します。
-                利用可能なセクション: business_risks, mda, capex_overview, facility_plans, management_policy
-                """,
-            method: "GET",
-            path: "/v1/companies/{code}/filing-content",
-            feature: "filing",
-            parameters: [
-                ApiSkillParameter(
-                    name: "code",
-                    location: .path,
-                    type: .string,
-                    description: "銘柄コード（例: 6103）",
-                    required: true
-                ),
-                ApiSkillParameter(
-                    name: "doc_id",
-                    location: .query,
-                    type: .string,
-                    description: "書類ID（省略時は最新の有価証券報告書）",
-                    required: false
-                ),
-                ApiSkillParameter(
-                    name: "sections",
-                    location: .query,
-                    type: .string,
-                    description: "抽出セクション（カンマ区切り。省略時は全セクション）",
-                    required: false
-                ),
-            ],
-            instructions: """
-                有報のテキスト抽出（Filing）。事業別売上の構造化数値は get-breakdown。
-                格納済みデータのみ。未抽出は 404、DB 非接続は 503。
-                ?sections=mda,business_risks（カンマ区切り文字列）。
-                例: GET /v1/companies/6103/filing-content?sections=mda,business_risks
                 """
         ),
         ApiSkill(
@@ -488,7 +447,6 @@ public func apiSkillsCatalog() -> [ApiSkill] {
             instructions: """
                 Breakdown（報告セグメント/地域別売上、従業員数、のれん、報告セグメント別指標、設備投資マトリクス、
                 有利子負債、資産の種類別の構造化）。
-                自由テキストのセグメント記述は get-filing-content の segments。
                 格納済みデータのみ。未算出は 404、DB 非接続は 503。
                 例: GET /v1/companies/6758/breakdown?axis=segment
                 例: GET /v1/companies/6758/breakdown?axis=geography

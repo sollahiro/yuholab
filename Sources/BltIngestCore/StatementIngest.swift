@@ -2,9 +2,9 @@
 // 抽出は BlueTickerCore のファサード（extractStatement）に委譲し、ここでは対象選定・staleness 判定・
 // DB upsert のみを担う（ネットワーク非依存でテスト可能）。
 //
-// `filingSectionCandidates`（`listedCodes × 会社有報(120・府令010) × 直近 years 件`）をそのまま再利用し、
+// `annualReportCandidates`（`listedCodes × 会社有報(120・府令010) × 直近 years 件`）をそのまま再利用し、
 // 返ってきた docID ごとに抽出結果を1行として格納する（company_filing_sections と同じ「1書類=1行」設計）。
-// 複数年度対応は本関数の呼び出し元が filingSectionCandidates から複数 docID を受け取ることで自然に
+// 複数年度対応は本関数の呼び出し元が annualReportCandidates から複数 docID を受け取ることで自然に
 // 達成され、`StatementAnalyzer` 自体を複数年度対応に拡張する必要はない
 // （docs/statement.md）。
 //
@@ -42,7 +42,7 @@ public typealias StatementExtractor = @Sendable (String) async -> StatementDocRe
 
 /// `listedCodes`（呼び出し元は上場全体を渡す想定。日経225は `priorityCodes` で処理順のみ）の有報
 /// （直近 years 年ぶん）を走査し、未抽出 or バージョン不一致のものを抽出・格納する。`limit` は新規抽出件数の上限（バッチ実行用）。
-/// `explicitCodes` / `priorityCodes` は filing-sections/breakdowns と同じ意味。
+/// `explicitCodes` / `priorityCodes` は breakdowns と同じ意味。
 /// `cachedDocIDs` はローカル XBRL 展開済み。処理順は各社の最新有報 → 前年以降。同一年次内は
 /// 日経225 → キャッシュ済み → 欠測/版ずれのラウンドロビン。
 /// `candidateSets` を渡すと候補選定クエリを省略する（呼び出し元がステージ間で候補を共有するとき）。
@@ -50,15 +50,15 @@ func runStatementIngest(
     db: Database, listedCodes: Set<String>, years: Int,
     limit: Int?, explicitCodes: Set<String>? = nil, priorityCodes: Set<String> = [],
     cachedDocIDs: Set<String> = [],
-    candidateSets: FilingSectionCandidateSets? = nil,
+    candidateSets: AnnualReportCandidateSets? = nil,
     forceDocIDs: Set<String> = [],
     logger: Logger? = nil, extract: StatementExtractor
 ) async throws -> StatementIngestSummary {
-    let sets: FilingSectionCandidateSets
+    let sets: AnnualReportCandidateSets
     if let candidateSets {
         sets = candidateSets
     } else {
-        sets = try await filingSectionCandidates(
+        sets = try await annualReportCandidates(
             db: db, listedCodes: listedCodes, explicitCodes: explicitCodes, years: years, logger: logger)
     }
     let baseCandidates = sets.keep

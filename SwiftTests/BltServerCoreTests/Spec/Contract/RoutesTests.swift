@@ -92,8 +92,6 @@ private func send(
             #expect(versions?["xbrl_facts"] == nil)
             #expect(versions?["company_financials"] as? String == companyFinancialsCacheVersion)
             #expect(versions?["company_financials_min_servable"] as? Int == companyFinancialsMinServableVersion)
-            #expect(versions?["filing_sections"] as? String == filingSectionsCacheVersion)
-            #expect(versions?["filing_sections_min_servable"] as? Int == filingSectionsMinServableVersion)
             #expect(versions?["breakdown_product_service"] as? String == productServiceBreakdownCacheVersion)
             #expect(versions?["breakdown_product_service_min_servable"] as? Int == productServiceBreakdownMinServableVersion)
             #expect(versions?["statement"] as? String == statementCacheVersion)
@@ -143,7 +141,6 @@ private func send(
                 "/v1/companies/7203/waterfall",
                 "/v1/companies/7203/waterfall/segment",
                 "/v1/companies/7203/waterfall/geography",
-                "/v1/companies/7203/filing-content",
             ] {
                 let (status, json) = try await send(app, path)
                 #expect(status == .serviceUnavailable)
@@ -404,14 +401,6 @@ private func send(
                 app, "/v1/companies/7203/waterfall/segment?metric=nope")
             #expect(status == .badRequest)
             #expect(json?["status"] as? Int == 400)
-        }
-    }
-
-    @Test func filingContentReturns404WhenNotStored() async throws {
-        try await withApp(databases: true) { app in
-            let (status, json) = try await send(app, "/v1/companies/7203/filing-content")
-            #expect(status == .notFound)
-            #expect(json?["error"] as? String == "書類本文は未抽出です")
         }
     }
 

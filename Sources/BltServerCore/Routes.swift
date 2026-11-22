@@ -36,8 +36,6 @@ func registerRoutes(
             "cache_versions": [
                 "company_financials": companyFinancialsCacheVersion,
                 "company_financials_min_servable": companyFinancialsMinServableVersion,
-                "filing_sections": filingSectionsCacheVersion,
-                "filing_sections_min_servable": filingSectionsMinServableVersion,
                 "breakdown_product_service": productServiceBreakdownCacheVersion,
                 "breakdown_product_service_min_servable": productServiceBreakdownMinServableVersion,
                 "breakdown_segment": segmentBreakdownCacheVersion,
@@ -242,22 +240,6 @@ func registerRoutes(
         }
     }
 
-    // GET /v1/companies/{code}/filing-content?doc_id=...&sections=a,b
-    // DB（有報セクション取り込み company_filing_sections）の格納済みセクション本文のみを返す。
-    // 有報のライブ抽出（9MB DL＋SwiftSoup）は大企業で 1GB OOM を実測したため撤去し、重い抽出は
-    // ingest（有報セクション取り込み）へ閉じ込めた。未抽出は 404・DB 非接続は 503（financials と同型・フォールバックなし）。
-    v1.get("companies", ":code", "filing-content") { req async -> Response in
-        let code = req.parameters.get("code") ?? ""
-        let docId = req.query[String.self, at: "doc_id"]
-        let sections = req.query[String.self, at: "sections"]
-            .map { $0.split(separator: ",").map(String.init) }
-        return makeStoredDataResponse(
-            await serveStoredFilingSections(
-                code: code, docId: docId, sections: sections, db: dbAvailable ? req.db : nil,
-                logger: req.logger),
-            notFoundMessage: "書類本文は未抽出です")
-    }
-
     // GET /v1/companies/{code}/breakdown?axis=geography&doc_id=...
     // DB（内訳取り込み company_breakdowns）の格納済み内訳のみを返す。
     // axis は segment / geography / 決定論指標軸（省略時 segment）。product_service は廃止（404）。
@@ -277,7 +259,7 @@ func registerRoutes(
 
     // GET /v1/companies/{code}/statement?years=5&doc_id=...
     // DB（Statement 取り込み company_statements）の格納済み BS/PL/CF/SS のみを返す。ライブ抽出へはフォールバック
-    // しない（filing-sections/breakdowns と同型）。Statement 取り込み の対象母集団は上場全体（日経225は処理順のみ。
+    // しない（breakdowns と同型）。Statement 取り込み の対象母集団は上場全体（日経225は処理順のみ。
     // ingest 側の制約。docs/statement.md）。
     v1.get("companies", ":code", "statement") { req async -> Response in
         let code = req.parameters.get("code") ?? ""
@@ -433,17 +415,6 @@ func serveStoredOverview(
 ) async -> StoredDataServeResult {
     await serveStored(db: db, logger: logger) { db in
         try await loadStoredOverview(code: code, db: db)
-    }
-}
-
-/// `filing-content` の DB 読み取り共通ロジック。`db` の扱いは `serveStoredFinancials` 参照。
-func serveStoredFilingSections(
-    code: String, docId: String?, sections: [String]?, db: Database?,
-    logger: Logger
-) async -> StoredDataServeResult {
-    await serveStored(db: db, logger: logger) { db in
-        try await loadStoredFilingSections(
-            code: code, docId: docId, sections: sections, db: db)
     }
 }
 

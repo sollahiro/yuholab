@@ -21,7 +21,7 @@ struct IngestTargetTests {
     @Test("単一対象を選択")
     func singleTarget() {
         #expect(parseIngestTargets("financials") == [.financials])
-        #expect(parseIngestTargets("filing-sections") == [.filingSections])
+        #expect(parseIngestTargets("filing-sections") == nil)  // 廃止済み
         #expect(parseIngestTargets("breakdowns") == [.breakdowns])
         #expect(parseIngestTargets("statements") == [.statements])
         #expect(parseIngestTargets("statement-notes") == [.notes])
@@ -32,16 +32,16 @@ struct IngestTargetTests {
 
     @Test("複数対象をカンマ区切りで選択")
     func multipleTargets() {
-        #expect(parseIngestTargets("financials,filing-sections") == [.financials, .filingSections])
+        #expect(parseIngestTargets("financials,filing-sections") == nil)
         #expect(
             parseIngestTargets(
-                "financials,filing-sections,breakdowns,statements,statement-notes,overviews,relations,industry-kpis")
+                "financials,breakdowns,statements,statement-notes,overviews,relations,industry-kpis")
                 == Set(IngestTarget.allCases))
     }
 
     @Test("前後空白と重複を許容する")
     func whitespaceAndDuplicates() {
-        #expect(parseIngestTargets(" financials , filing-sections ") == [.financials, .filingSections])
+        #expect(parseIngestTargets(" financials , breakdowns ") == [.financials, .breakdowns])
         #expect(parseIngestTargets("statements,statements") == [.statements])
     }
 
