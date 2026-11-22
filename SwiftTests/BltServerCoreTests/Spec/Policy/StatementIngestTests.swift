@@ -1,4 +1,4 @@
-// Statement 取り込みの DB ロジック（対象選定＝ filingSectionCandidates 再利用・staleness 判定・upsert・limit・
+// Statement 取り込みの DB ロジック（対象選定＝ annualReportCandidates 再利用・staleness 判定・upsert・limit・
 // purge）と read 経路（loadStoredStatement の code 直近N件／doc_id 指定・バージョンゲート）を検証する。
 // 抽出（extractStatement）は EDINET 依存のため、フェイク抽出器を注入してネットワーク非依存で見る。
 //
@@ -233,7 +233,7 @@ private func fakeYear(_ marker: String = "資産合計", docID: String = "S1") -
         try await withMigratedApp { app in
             try await seedDoc("S1", secCode: "72030", db: app.db)
             try await seedDoc("S2", secCode: "67580", db: app.db)
-            let sets = FilingSectionCandidateSets(
+            let sets = AnnualReportCandidateSets(
                 keep: [FilingDocCandidate(docID: "S1", code: "7203", submitDateTime: "2025-06-20 09:00")],
                 purge: [])
 

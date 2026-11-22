@@ -1,6 +1,6 @@
 // 業種 KPI 取り込み: 上場企業の有報から銀行 XBRL 数値 KPI を抽出し industry_kpi_facts へ upsert する。
 // 抽出は BlueTickerCore のファサードに委譲し、ここでは対象選定・staleness・DB upsert だけを担う。
-// 候補選定は filingSectionCandidates を再利用する。
+// 候補選定は annualReportCandidates を再利用する。
 //
 // `--stages` の既定からは外す（relations と同じ。本番 drain に乗せない。Mac で明示指定）。
 // 対象会社は「提出者業種が銀行業」または許可リストまたは statements の銀行様式 IS /
@@ -31,15 +31,15 @@ func runIndustryKpiIngest(
     limit: Int?, explicitCodes: Set<String>? = nil, priorityCodes: Set<String> = [],
     cachedDocIDs: Set<String> = [],
     industryGroup: String = industryKpiGroupBank,
-    candidateSets: FilingSectionCandidateSets? = nil,
+    candidateSets: AnnualReportCandidateSets? = nil,
     forceDocIDs: Set<String> = [],
     logger: Logger? = nil, resolve: IndustryKpiResolveFn
 ) async throws -> IndustryKpiIngestSummary {
-    let sets: FilingSectionCandidateSets
+    let sets: AnnualReportCandidateSets
     if let candidateSets {
         sets = candidateSets
     } else {
-        sets = try await filingSectionCandidates(
+        sets = try await annualReportCandidates(
             db: db, listedCodes: listedCodes, explicitCodes: explicitCodes, years: years, logger: logger)
     }
     let baseCandidates = sets.keep

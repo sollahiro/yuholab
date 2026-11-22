@@ -128,7 +128,6 @@ flowchart LR
 | `GET /v1/benchmark/{group}` | 業種ベンチマーク。業種グループ（現状 `bank` のみ）の全社の業種 KPI（`industry_kpi_facts`）。会社ごとに最新の有報 1 件で、連結を優先。`companies[]` は `{code, name, sector, icon_url, doc_id, fy_end, kpis{key:{value,unit,period_basis,scope}}, warnings}`。未公開の業種・公開できる会社が無いときは 404 |
 | `GET /v1/companies/{code}/waterfall/segment` | 報告セグメント年次（`years` / `fiscal_year`。つなぎは years[] に載せる） |
 | `GET /v1/companies/{code}/waterfall/geography` | 地域別売上の年次推移（`years` / `fiscal_year`。地域ラベルを region コードへ正規化し、比べられる年を `comparable_group` に分ける） |
-| `GET /v1/companies/{code}/filing-content` | セクション本文 |
 | `GET /v1/companies/{code}/breakdown?axis=` | breakdowns（上場・格納済み。LLM の `needs_review` / `llm_unit_unresolved` は出さない。`docs/breakdown.md`） |
 | `GET /v1/companies/{code}/statement` · `/shares` | Statement / Shares（上場。日経225は処理順の優先のみ） |
 | `GET /v1/feed/updates` | Feed Update（直近 N 日の提出書類。既定 90 日・10 件。同日過多は安定サンプル。`total.day` / `total.week`） |
@@ -165,7 +164,7 @@ Neon 接続・R2 秘密・LLM キーの正本は `.env.example`。プロセス�
 | sync | `edinet_documents` / `edinet_sync_state` |
 | 生 XBRL | ローカル展開（L1）＋ R2 ZIP（L2、`BLT_R2_XBRL_BUCKET` 未設定時はローカルのみ。キー `jp/edinet/xbrl/{docID}.zip`） |
 | financials | `company_financials` |
-| filing-sections / breakdowns / statements / notes | 各テーブル（書類単位） |
+| breakdowns / statements / notes | 各テーブル（書類単位） |
 | overview | `company_overviews`（会社1社=1行。由来 doc_id は列。ingest stage は `overviews`。公開 REST は `GET /v1/companies/{code}/overview`。read 床は `overview-v1`。Filing `texts` には載せない） |
 | relations | `company_relations`（書類 1 件の相手 1 件 = 1 行。会社ごとに最新有報 1 件の行だけを持ち、逆引き用の行は作らない。ingest stage は `relations`。区分は決定論（表内の見出し行 → 名前の接頭辞 → 表外の見出し）で、決まらない表だけ Jev（閾値 0.9。未満は `needs_review`）。名前解決は決定論（EDINET コードリストの提出者名・英字名 → 上場会社の子会社索引。索引は顧客・関連会社の行だけに使う）。記載の省略は `kind = none` の状態行で未抽出と区別する。関連会社・その他の関係会社・`unclassified` は格納しない（`retiredRelationKinds`。抽出と区分判定は行い、格納の直前に外す。子会社行は顧客名の親会社解決の索引に使うので残す）。大株主の住所は保存のみ） |
 

@@ -5,7 +5,6 @@
 export const STAGES = [
   { key: "financials", label: "財務サマリー", table: "company_financials" },
   { key: "statements", label: "財務諸表", table: "company_statements" },
-  { key: "filing_sections", label: "有報の文章", table: "company_filing_sections" },
   { key: "breakdowns", label: "内訳", table: "company_breakdowns" },
   { key: "industry_kpis", label: "業種KPI", table: "industry_kpi_facts" },
 ];

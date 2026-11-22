@@ -329,26 +329,6 @@ public extension BltServerContext {
         }
     }
 
-    /// 有報セクション取り込み: 書類1件分の XBRL を取得（XBRL 取得キャッシュ経由）し、全セクションを抽出して
-    /// 格納用 payload を返す。重い SwiftSoup 抽出を含むため **ingest 専用**（大企業の有報で 1GB OOM を
-    /// 実測。serving のライブ抽出は撤去し、read は Neon 格納済みを返す）。ダウンロード失敗は nil（戻り値パターン）。
-    /// texts は退役キーを除く xbrlSections の全 key を格納（未検出は ""）。specials は保存しない。
-    func extractFilingSections(docID: String, correctionDocIDs: [String] = []) async -> FilingSectionsPayload? {
-        guard let xbrlDir = await downloadAnnualFilingXbrl(
-            docID: docID, correctionDocIDs: correctionDocIDs
-        ) else { return nil }
-
-        // 節ごとの XBRL TextBlock を正本にし、無い節だけ honbun HTML を1回パースして見出しで探す。
-        let stored = xbrlSections.filter { !retiredFilingSectionKeys.contains($0.key) }
-        let found = XBRLParser().extractSectionsPreferringTextBlocks(
-            in: xbrlDir, sections: stored)
-        var texts: [String: String] = [:]
-        for key in stored.keys { texts[key] = found[key] ?? "" }  // 全 key 存在を維持
-
-        // segments / geography / revenue_recognition は保存しない（退役。breakdown は XBRL から直接解決する）。
-        return FilingSectionsPayload(texts: texts, specials: [:])
-    }
-
     /// 上場ユニバース（東証上場）の 4 桁コード集合。有報セクション取り込みの対象選定に使う
     /// （EDINET 公式 CSV の「上場区分」から導出。roadmap の著作権判断参照）。
     func listedCompanyCodes() async -> Set<String> {
@@ -404,7 +384,7 @@ public extension BltServerContext {
     }
 
     /// Statement 取り込み（Statement 本体）: 単一書類の XBRL から BS/PL/CF/SS を抽出する。決定論のみ（LLM不要）。
-    /// `extractFilingSections`（有報セクション取り込み）と同型: 1書類分のみを扱い、複数年度の履歴集約は
+    /// statements 取り込みと同型: 1書類分のみを扱い、複数年度の履歴集約は
     /// 行わない。US-GAAP は `.notApplicable`（連結に数値 fact が無く正規化不可。notes と同方針）。
     /// ダウンロード失敗は `.failed`。
     func extractStatement(
@@ -417,7 +397,7 @@ public extension BltServerContext {
     }
 
     /// ユーザーが用意した優先コード一覧（`assets/nikkei225.csv`）の証券コード集合。
-    /// financials/filing-sections/breakdowns/statement-notes 取り込みの処理順序づけに使う
+    /// financials/breakdowns/statement-notes 取り込みの処理順序づけに使う
     /// （対象選定ではなく優先度のみ）。ファイル未配置なら空集合（優先なし・従来どおりの順序にフォールバック）。
     func priorityIngestCodes() async -> Set<String> {
         loadPriorityIngestCodes()

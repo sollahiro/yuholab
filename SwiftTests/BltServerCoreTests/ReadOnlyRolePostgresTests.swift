@@ -139,7 +139,6 @@ import Vapor
                 "/v1/companies/7203/waterfall/geography",
                 "/v1/companies/7203/overview",
                 "/v1/companies/7203/relations",
-                "/v1/companies/7203/filing-content",
                 "/v1/companies/7203/breakdown",
                 "/v1/companies/7203/statement",
                 "/v1/companies/7203/shares",

@@ -10,9 +10,9 @@
 // （2026-09: employees/rd/goodwill・報告セグメント別指標軸も日経225限定を廃止して拡大）。
 // 日経225（`priorityCodes`）は処理順の先頭寄せに使う。`--codes` 指定時はその集合に絞る。
 //
-// 候補選定ロジック自体は有報セクション取り込み（`filingSectionCandidates`、「対象 × 有報(120) × 直近 years 件」）を再利用する
+// 候補選定ロジック自体は有報セクション取り込み（`annualReportCandidates`、「対象 × 有報(120) × 直近 years 件」）を再利用する
 // （事業別内訳は有報と同じ書類集合から取れるため）。年数（`years`）は呼び出し元が有報セクション取り込みと同じ
-// `filingSectionsIngestYears` を渡す想定（内訳取り込み専用の別値は持たない）。
+// `annualReportIngestYears` を渡す想定（内訳取り込み専用の別値は持たない）。
 //
 // staleness 判定は有報セクション取り込みと異なる（docs/breakdown.md）。
 // - version-gated な source（決定論 + LLM）: cache_version が現行と不一致なら再計算する。
@@ -68,17 +68,17 @@ func runBreakdownIngest(
     limit: Int?, explicitCodes: Set<String>? = nil, priorityCodes: Set<String> = [],
     cachedDocIDs: Set<String> = [],
     axis: String = breakdownAxisProductService,
-    candidateSets: FilingSectionCandidateSets? = nil,
+    candidateSets: AnnualReportCandidateSets? = nil,
     forceDocIDs: Set<String> = [],
     logger: Logger? = nil,
     resolve: BreakdownResolveFn
 ) async throws -> BreakdownIngestSummary {
     let currentCacheVersion = breakdownCacheVersion(forAxis: axis)
-    let sets: FilingSectionCandidateSets
+    let sets: AnnualReportCandidateSets
     if let candidateSets {
         sets = candidateSets
     } else {
-        sets = try await filingSectionCandidates(
+        sets = try await annualReportCandidates(
             db: db, listedCodes: listedCodes, explicitCodes: explicitCodes, years: years, logger: logger)
     }
     let baseCandidates = sets.keep

@@ -5,10 +5,10 @@
 // note_type 別に踏襲する。呼び出し元（`FactsIngest.swift`）が note_type ごとに本関数を呼ぶ。
 //
 // 対象母集団は statements と同じ上場全体（2026-09: 日経225限定を廃止して拡大。呼び出し元
-// `FactsIngest.swift` が `listedCompanyCodes()` を `filingSectionCandidates` の `listedCodes`
+// `FactsIngest.swift` が `listedCompanyCodes()` を `annualReportCandidates` の `listedCodes`
 // 引数として渡すことで実現する）。日経225（`priorityIngestCodes()`）は処理順の先頭寄せのみ。
 // 候補選定ロジックは 有報セクション取り込み・内訳取り込み・
-// Statement 取り込み と同じ `filingSectionCandidates` を再利用する。
+// Statement 取り込み と同じ `annualReportCandidates` を再利用する。
 //
 // staleness 判定は 内訳取り込み と同型（`docs/breakdown.md`）。
 // - xbrl_facts / not_applicable 経由（決定的）: cache_version が現行と不一致なら再計算してよい。
@@ -55,16 +55,16 @@ func runStatementNotesIngest(
     limit: Int?, explicitCodes: Set<String>? = nil, priorityCodes: Set<String> = [],
     cachedDocIDs: Set<String> = [],
     noteType: String,
-    candidateSets: FilingSectionCandidateSets? = nil,
+    candidateSets: AnnualReportCandidateSets? = nil,
     forceDocIDs: Set<String> = [],
     logger: Logger? = nil, resolve: StatementNoteResolveFn
 ) async throws -> StatementNotesIngestSummary {
     let currentCacheVersion = statementNoteCacheVersion(forType: noteType)
-    let sets: FilingSectionCandidateSets
+    let sets: AnnualReportCandidateSets
     if let candidateSets {
         sets = candidateSets
     } else {
-        sets = try await filingSectionCandidates(
+        sets = try await annualReportCandidates(
             db: db, listedCodes: listedCodes, explicitCodes: explicitCodes, years: years, logger: logger)
     }
     let baseCandidates = sets.keep

@@ -109,7 +109,7 @@ curl -sS -H "X-HAPIS-Smoke-Token: $TOKEN" "$GATEWAY_BASE_URL/v1/companies?q=7203
 
 重い ingest はローカル。スケジュール（launchd 等）はマシン固有のためリポジトリに置かない。ジョブ編成・実行順・write ガード・limit / skip は `.agents/skills/production-ingest/SKILL.md`。決定論指標軸は ingest 側で 30/回（母集団は上場全体。日経225は処理順の優先のみ）。
 
-`assets/nikkei225.csv`（gitignore）: financials / filing-sections / statements / statement-notes / breakdowns 全軸の処理順の優先。未配置なら優先なし（対象母集団は上場全体のまま。0件にはならない）。
+`assets/nikkei225.csv`（gitignore）: financials / statements / statement-notes / breakdowns 全軸の処理順の優先。未配置なら優先なし（対象母集団は上場全体のまま。0件にはならない）。
 
 ## EDINET マスタ CSV
 

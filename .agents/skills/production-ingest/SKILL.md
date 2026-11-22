@@ -44,7 +44,6 @@ stage 系統ごとにプロセスを分け、1 プロセスに `--stages` を詰
 守る順序と依存:
 
 - `sync` を最初に回す。新着書類の台帳（`edinet_documents`）が無いと、他の stage の対象が決まらない。
-- `filing-sections` は R2/L1 の温め用で、他の stage の成否に依存しない。回さなくても取り込みは成立するので、実行側の判断で飛ばしてよい。
 - `financials` は組立の最後。BPS / EPS を埋めるなら `statements` と `statement-notes`（`per_share_information,issued_shares_and_capital`）を先に回す。
 - `breakdowns` は時間がかかり、LLM（Jev）にも依存するので、他の stage と分けて回す。依存が無ければ別スロットでもよい。
 - `overviews` と `relations` は他 stage に依存しない。`--stages` 省略時の `ingest` には `relations` と `industry-kpis` は入らない（明示指定だけ）。`industry-kpis` は標準サイクルに載せない。
@@ -143,7 +142,7 @@ stage 系統ごとにプロセスを分け、1 プロセスに `--stages` を詰
 ```bash
 DATABASE_URL="$BLT_NEON_WRITE_DATABASE_URL" ./.build/release/blt-ingest ingest \
   --codes 7203 --doc-ids S100W0S7 \
-  --stages financials,statements,statement-notes,breakdowns,filing-sections \
+  --stages financials,statements,statement-notes,breakdowns \
   --note-types per_share_information
 ```
 

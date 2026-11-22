@@ -1,7 +1,5 @@
 # Pre-existing occurrences allowed by scripts/ci/flags.sh. Generated once; may only shrink.
 # flag<TAB>path<TAB>sha256(whitespace-normalised line)[:16]. Text is hashed, never stored.
-full-table-all	Sources/BltServerCore/FilingSectionsIngest.swift	405402eb69e63c2f
-full-table-all	Sources/BltServerCore/FilingSectionsIngest.swift	8083678b07671383
 full-table-all	Sources/BltServerCore/FinancialsIngest.swift	99ff55429b857c87
 full-table-all	Sources/BltServerCore/FinancialsIngest.swift	ac91fb254454e5b5
 full-table-all	Sources/BltServerCore/IconsIngest.swift	7eb5d0f38203ba76

@@ -26,7 +26,7 @@
       "path": "/v1/companies/{code}/filings",
       "operation_id": "get-filings",
       "summary": "List filings",
-      "description": "EDINET document list for an issuer, including doc_id values used by filing-content.",
+      "description": "EDINET document list for an issuer.",
       "parameters": [
         {
           "name": "code",
@@ -121,36 +121,6 @@
           "required": false,
           "description": "How many years of waterfall to return.",
           "schema": { "type": "integer" }
-        }
-      ]
-    },
-    {
-      "method": "GET",
-      "path": "/v1/companies/{code}/filing-content",
-      "operation_id": "get-filing-content",
-      "summary": "Filing section text",
-      "description": "Section text from an EDINET filing. doc_id is optional; when omitted, the latest annual report is used.",
-      "parameters": [
-        {
-          "name": "code",
-          "in": "path",
-          "required": true,
-          "description": "Issuer ticker code (e.g. 6758).",
-          "schema": { "type": "string" }
-        },
-        {
-          "name": "doc_id",
-          "in": "query",
-          "required": false,
-          "description": "EDINET document id. Optional; omit for the latest annual report.",
-          "schema": { "type": "string" }
-        },
-        {
-          "name": "sections",
-          "in": "query",
-          "required": false,
-          "description": "Comma-separated section keys. Omit for all sections.",
-          "schema": { "type": "string" }
         }
       ]
     },

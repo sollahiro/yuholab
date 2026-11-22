@@ -217,7 +217,7 @@ test("connector page lists only public read-only tools", () => {
   const en = readFileSync(join(publicDir, "en/connector.html"), "utf8");
   assert.equal(assetPathFor("/connector/"), "/connector");
   for (const html of [ja, en]) {
-    for (const tool of ["search_companies", "get_overview", "get_filings", "get_filing_content", "get_financials", "get_waterfall", "get_statement", "get_shares", "get_breakdown", "get_feed_updates"]) {
+    for (const tool of ["search_companies", "get_overview", "get_filings", "get_financials", "get_waterfall", "get_statement", "get_shares", "get_breakdown", "get_feed_updates"]) {
       assert.match(html, new RegExp(`<code>${tool}</code>`));
     }
     assert.doesNotMatch(html, /get_screen|get_feed_trend|screen_snapshot/);

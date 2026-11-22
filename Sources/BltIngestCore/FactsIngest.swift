@@ -21,11 +21,11 @@ let unpublishedBreakdownIngestLimit = 30
 /// 財務取り込み（計算済み財務サマリ）→ 有報セクション取り込み（有報セクション）→
 /// 内訳取り込み（product_service/geography・決定論指標軸ともに上場全体。日経225は処理順の先頭寄せ）を取り込む。
 ///
-/// `targets` は実行する financials/filing-sections/breakdowns/statements/statement-notes/overviews/industry-kpis の集合
-/// （CLI: `--stages filing-sections` 等）。既定は relations と industry-kpis 以外。overviews は
+/// `targets` は実行する financials/breakdowns/statements/statement-notes/overviews/industry-kpis の集合
+/// （CLI: `--stages breakdowns` 等）。既定は relations と industry-kpis 以外。overviews は
 /// `OPENROUTER_OVERVIEW_API_KEY` 未設定時はスキップされる。
 /// 例えば有報セクション取り込みだけを先に流したいとき、重い financials の全件 drain を挟まずに済む。
-/// `codes` は financials/filing-sections/breakdowns の対象を明示的な証券コード集合に絞る（CLI: `--codes 7203,6758`）。
+/// `codes` は financials/breakdowns の対象を明示的な証券コード集合に絞る（CLI: `--codes 7203,6758`）。
 /// `docIDs` は会社-FY（原本 120 の doc_id）単位の再 ingest（CLI: `--doc-ids S100W0S7`）。
 /// 指定時は該当書類だけを keep し、cache_version / needs_review に関係なく再計算する（分類で
 /// missing に入れたあと実処理ループでも fresh skip しない。艦隊の skip は変えない）。
@@ -56,11 +56,11 @@ public func runFactsIngestCommand(
     let app = try BltCommandDatabase.connect(urlString: urlString, label: "blt-ingest")
     do {
         try await migrateBltSchema(app)
-        // 上場・国内法人の対象ユニバース。financials/filing-sections 共通で候補を絞り込み、
+        // 上場・国内法人の対象ユニバース。financials 共通で候補を絞り込み、
         // 上場廃止・外国法人など二度と成功しない企業への無駄なリトライを避ける。
         let listed = await context.listedCompanyCodes()
         // ユーザーが用意した優先コード一覧（`assets/nikkei225.csv`）。対象選定ではなく
-        // financials/filing-sections/breakdowns/statement-notes 共通の処理順序づけにのみ使う
+        // financials/breakdowns/statement-notes 共通の処理順序づけにのみ使う
         // （未配置なら空集合＝優先なし）。
         let priority = await context.priorityIngestCodes()
         if !priority.isEmpty {
@@ -68,7 +68,7 @@ public func runFactsIngestCommand(
                 "Priority ingest codes loaded",
                 metadata: ["event": "priority_codes_loaded", "count": "\(priority.count)"])
         }
-        // `--codes` 指定時は financials/filing-sections の対象をその集合へ絞り、`limit` は無視して全件処理する
+        // `--codes` 指定時は financials の対象をその集合へ絞り、`limit` は無視して全件処理する
         // （手動・単発の対象は小さい前提）。
         let stageLimit = (codes == nil && docIDs == nil) ? limit : nil
         if let codes {
@@ -87,33 +87,33 @@ public func runFactsIngestCommand(
         // 2026-09: 日経225限定を廃止し上場全体へ拡大（`priority` は処理順の先頭寄せとして残す）。
         let deterministicMetricsListed = codes ?? listed
         let needsListedFilings =
-            targets.contains(.filingSections) || targets.contains(.breakdowns)
+            targets.contains(.breakdowns)
             || targets.contains(.statements) || targets.contains(.industryKpis)
         let needsDeterministicMetricsFilings =
             targets.contains(.notes) || targets.contains(.breakdowns)
 
         // 会社有報の一覧読みは全候補集合で 1 回だけにする（母集団ごとの再走査を避ける）。
         var annualDocs: [EdinetDocumentListing]?
-        func loadCandidateSets(_ listedCodes: Set<String>) async throws -> FilingSectionCandidateSets {
+        func loadCandidateSets(_ listedCodes: Set<String>) async throws -> AnnualReportCandidateSets {
             if listedCodes.isEmpty {
-                return FilingSectionCandidateSets(keep: [], purge: [])
+                return AnnualReportCandidateSets(keep: [], purge: [])
             }
             if annualDocs == nil {
                 annualDocs = try await annualReportDisclosureDocs(db: app.db, logger: app.logger)
             }
-            return await filingSectionCandidates(
+            return await annualReportCandidates(
                 docs: annualDocs ?? [], listedCodes: listedCodes, explicitCodes: codes,
-                years: filingSectionsIngestYears, explicitDocIDs: docIDs)
+                years: annualReportIngestYears, explicitDocIDs: docIDs)
         }
 
-        let listedFilingSets: FilingSectionCandidateSets
+        let listedFilingSets: AnnualReportCandidateSets
         if needsListedFilings {
             listedFilingSets = try await loadCandidateSets(listed)
         } else {
-            listedFilingSets = FilingSectionCandidateSets(keep: [], purge: [])
+            listedFilingSets = AnnualReportCandidateSets(keep: [], purge: [])
         }
 
-        let publicBreakdownSets: FilingSectionCandidateSets
+        let publicBreakdownSets: AnnualReportCandidateSets
         if targets.contains(.breakdowns) {
             if publicBreakdownListed == listed {
                 publicBreakdownSets = listedFilingSets
@@ -121,10 +121,10 @@ public func runFactsIngestCommand(
                 publicBreakdownSets = try await loadCandidateSets(publicBreakdownListed)
             }
         } else {
-            publicBreakdownSets = FilingSectionCandidateSets(keep: [], purge: [])
+            publicBreakdownSets = AnnualReportCandidateSets(keep: [], purge: [])
         }
 
-        let deterministicMetricsFilingSets: FilingSectionCandidateSets
+        let deterministicMetricsFilingSets: AnnualReportCandidateSets
         if needsDeterministicMetricsFilings {
             if deterministicMetricsListed == listed && needsListedFilings {
                 deterministicMetricsFilingSets = listedFilingSets
@@ -134,7 +134,7 @@ public func runFactsIngestCommand(
                 deterministicMetricsFilingSets = try await loadCandidateSets(deterministicMetricsListed)
             }
         } else {
-            deterministicMetricsFilingSets = FilingSectionCandidateSets(keep: [], purge: [])
+            deterministicMetricsFilingSets = AnnualReportCandidateSets(keep: [], purge: [])
         }
 
         var inFlightOriginalIDs = Set(listedFilingSets.keep.map(\.docID))
@@ -206,27 +206,6 @@ public func runFactsIngestCommand(
                 servable: coverage?.servable, unservable: coverage?.unservable,
                 notApplicable: s4.notApplicable)
         }
-        if targets.contains(.filingSections) {
-            // 有報セクション取り込み: 上場企業の有報セクション本文を抽出・格納（filing-content の read-only 化）。
-            let s5 = try await runFilingSectionsIngest(
-                db: app.db, listedCodes: listed, years: filingSectionsIngestYears,
-                sectionKeys: currentFilingSectionKeys(), limit: stageLimit, explicitCodes: codes,
-                priorityCodes: priority, cachedDocIDs: cachedDocIDs,
-                candidateSets: listedFilingSets,
-                forceDocIDs: forceDocIDs,
-                logger: app.logger
-            ) { docID in
-                await context.extractFilingSections(
-                    docID: docID, correctionDocIDs: correctionIDsByOriginal[docID] ?? [])
-            }
-            let coverage = try? await withDbRetry(logger: app.logger, context: "company_filing_sections 集計") {
-                try await countServableFilingSections(db: app.db)
-            }
-            logIngestSummary(
-                app.logger, target: "filing-sections", attempted: s5.attempted, stored: s5.stored,
-                failed: s5.failed, skipped: s5.skipped,
-                servable: coverage?.servable, unservable: coverage?.unservable, purged: s5.purged)
-        }
         if targets.contains(.breakdowns) {
             // 内訳取り込み: product_service/geography・決定論指標軸ともに上場全体（`listed`。日経225=
             // `priority` は処理順の先頭寄せのみ）。`--codes` 時は全軸その集合。
@@ -252,7 +231,7 @@ public func runFactsIngestCommand(
                 let target: String
                 let listedCodes: Set<String>
                 let limit: Int?
-                let candidateSets: FilingSectionCandidateSets
+                let candidateSets: AnnualReportCandidateSets
                 let resolve: BreakdownResolveFn
             }
             let stages: [BreakdownStage] = [
@@ -312,7 +291,7 @@ public func runFactsIngestCommand(
             let selectedStages = axes.map { axes in stages.filter { axes.contains($0.axis) } } ?? stages
             for stage in selectedStages {
                 let summary = try await runBreakdownIngest(
-                    db: app.db, listedCodes: stage.listedCodes, years: filingSectionsIngestYears,
+                    db: app.db, listedCodes: stage.listedCodes, years: annualReportIngestYears,
                     limit: stage.limit, explicitCodes: codes, priorityCodes: priority,
                     cachedDocIDs: cachedDocIDs, axis: stage.axis, candidateSets: stage.candidateSets,
                     forceDocIDs: forceDocIDs,
@@ -357,7 +336,7 @@ public func runFactsIngestCommand(
         }
         if targets.contains(.statements) {
             // Statement 取り込み: 既定は上場全体（`listed`）。日経225（`priority`）は処理順の先頭寄せのみ。
-            // `--codes` 指定時はその集合を母集団にする（filing-sections / financials と同型）。
+            // `--codes` 指定時はその集合を母集団にする（financials と同型）。
             let statementListed = codes ?? listed
             if statementListed.isEmpty {
                 app.logger.warning(
@@ -365,7 +344,7 @@ public func runFactsIngestCommand(
                     metadata: ["event": "ingest_skipped", "target": "statements", "reason": "empty_listed_codes"])
             }
             let s7 = try await runStatementIngest(
-                db: app.db, listedCodes: statementListed, years: filingSectionsIngestYears, limit: stageLimit,
+                db: app.db, listedCodes: statementListed, years: annualReportIngestYears, limit: stageLimit,
                 explicitCodes: codes, priorityCodes: priority, cachedDocIDs: cachedDocIDs,
                 candidateSets: listedFilingSets,
                 forceDocIDs: forceDocIDs,
@@ -419,7 +398,7 @@ public func runFactsIngestCommand(
             for entry in statementNoteTypes {
                 if let noteTypeFilter, !noteTypeFilter.contains(entry.noteType) { continue }
                 let s8 = try await runStatementNotesIngest(
-                    db: app.db, listedCodes: statementNotesListed, years: filingSectionsIngestYears,
+                    db: app.db, listedCodes: statementNotesListed, years: annualReportIngestYears,
                     limit: stageLimit, explicitCodes: codes, priorityCodes: priority,
                     cachedDocIDs: cachedDocIDs,
                     noteType: entry.noteType,
@@ -521,13 +500,13 @@ public func runFactsIngestCommand(
                     listedFilingSets.keep.isEmpty && listedFilingSets.purge.isEmpty
                     ? try await loadCandidateSets(kpiListed) : listedFilingSets
                 // `--doc-ids` 指定の書類は対象会社の外でも残す（明示指定を優先）。
-                let kpiSets = FilingSectionCandidateSets(
+                let kpiSets = AnnualReportCandidateSets(
                     keep: baseSets.keep.filter {
                         kpiListed.contains($0.code) || forceDocIDs.contains($0.docID)
                     },
                     purge: baseSets.purge)
                 let s12 = try await runIndustryKpiIngest(
-                    db: app.db, listedCodes: kpiListed, years: filingSectionsIngestYears,
+                    db: app.db, listedCodes: kpiListed, years: annualReportIngestYears,
                     limit: stageLimit, explicitCodes: codes, priorityCodes: priority,
                     cachedDocIDs: cachedDocIDs, candidateSets: kpiSets,
                     forceDocIDs: forceDocIDs, logger: app.logger

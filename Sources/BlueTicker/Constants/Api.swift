@@ -65,7 +65,7 @@ public enum Api {
     /// 本番の listed 1 日最大は四半期報告書（140）1,432 件（2023-08-10）、半期報告書（160）693 件（2025-11-14）。
     /// 140 は廃止済みなので通常は届かない安全弁。
     public static let feedUpdateDayScanLimit = 2000
-    /// Statement 取り込み（Statement）read の既定年数。`filingSectionsIngestYears`（6年保持）以下に収める。
+    /// Statement 取り込み（Statement）read の既定年数。`annualReportIngestYears`（6年保持）以下に収める。
     public static let statementYearsDefault = 5
 
     // 件数上限
