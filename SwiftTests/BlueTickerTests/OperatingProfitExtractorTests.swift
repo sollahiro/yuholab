@@ -259,6 +259,69 @@ import Foundation
         }
     }
 
+    // MARK: - 計算法（売上高 − 売上原価 − 販管費。売上総利益・営業利益のタグ行が無い IFRS）
+
+    /// 日本ハム 2282 S100YEEQ（2026年3月期）の PL 形。営業利益の行は無く、売上高・売上原価・販管費だけが並ぶ。
+    @Test func testIfrsSalesMinusCostMinusSgaWhenNoGrossProfitOrOperatingProfitTag() {
+        let xml = XBRLTestSupport.makeXbrlDuration("""
+            <jpifrs_cor:NetSalesIFRS contextRef="CurrentYearDuration"
+                unitRef="JPY" decimals="-6">1457391000000</jpifrs_cor:NetSalesIFRS>
+            <jpifrs_cor:NetSalesIFRS contextRef="Prior1YearDuration"
+                unitRef="JPY" decimals="-6">1370553000000</jpifrs_cor:NetSalesIFRS>
+            <jpifrs_cor:CostOfSalesIFRS contextRef="CurrentYearDuration"
+                unitRef="JPY" decimals="-6">1206807000000</jpifrs_cor:CostOfSalesIFRS>
+            <jpifrs_cor:CostOfSalesIFRS contextRef="Prior1YearDuration"
+                unitRef="JPY" decimals="-6">1150170000000</jpifrs_cor:CostOfSalesIFRS>
+            <jpifrs_cor:SellingGeneralAndAdministrativeExpensesIFRS contextRef="CurrentYearDuration"
+                unitRef="JPY" decimals="-6">192984000000</jpifrs_cor:SellingGeneralAndAdministrativeExpensesIFRS>
+            <jpifrs_cor:SellingGeneralAndAdministrativeExpensesIFRS contextRef="Prior1YearDuration"
+                unitRef="JPY" decimals="-6">184000000000</jpifrs_cor:SellingGeneralAndAdministrativeExpensesIFRS>
+        """)
+        XBRLTestSupport.withXbrlDir(xml) { dir in
+            let result = extract(in: dir)
+            #expect(result.method == "computed_sales_cost_sga")
+            #expect(result.label == OperatingProfitExtractor.computedOperatingProfitLabel)
+            #expect(result.accountingStandard == "IFRS")
+            #expect(result.operatingProfit == 57_600_000_000)
+            #expect(result.operatingProfitPrior == 36_383_000_000)
+            #expect(result.sga == 192_984_000_000)
+            #expect(result.sgaPrior == 184_000_000_000)
+        }
+    }
+
+    /// 売上原価が無い年は売上を営業利益に見立てない（欠測を 0 にしない）。
+    @Test func testIfrsSalesMinusCostMinusSgaNeedsCost() {
+        let xml = XBRLTestSupport.makeXbrlDuration("""
+            <jpifrs_cor:NetSalesIFRS contextRef="CurrentYearDuration"
+                unitRef="JPY" decimals="-6">1457391000000</jpifrs_cor:NetSalesIFRS>
+            <jpifrs_cor:SellingGeneralAndAdministrativeExpensesIFRS contextRef="CurrentYearDuration"
+                unitRef="JPY" decimals="-6">192984000000</jpifrs_cor:SellingGeneralAndAdministrativeExpensesIFRS>
+        """)
+        XBRLTestSupport.withXbrlDir(xml) { dir in
+            let result = extract(in: dir)
+            #expect(result.method == "not_found")
+            #expect(result.operatingProfit == nil)
+        }
+    }
+
+    /// 本表に売上収益タグが無く、主要な経営指標等の売上だけがある会社（デジタルガレージ形：PL の収益計は
+    /// 金融収益・持分法益を含む）では算出しない。
+    @Test func testIfrsSalesMinusCostMinusSgaIgnoresSummarySales() {
+        let xml = XBRLTestSupport.makeXbrlDuration("""
+            <jpifrs_cor:RevenueIFRSSummaryOfBusinessResults contextRef="CurrentYearDuration"
+                unitRef="JPY" decimals="-6">40971000000</jpifrs_cor:RevenueIFRSSummaryOfBusinessResults>
+            <jpifrs_cor:CostOfSalesIFRS contextRef="CurrentYearDuration"
+                unitRef="JPY" decimals="-6">13285000000</jpifrs_cor:CostOfSalesIFRS>
+            <jpifrs_cor:SellingGeneralAndAdministrativeExpensesIFRS contextRef="CurrentYearDuration"
+                unitRef="JPY" decimals="-6">23492000000</jpifrs_cor:SellingGeneralAndAdministrativeExpensesIFRS>
+        """)
+        XBRLTestSupport.withXbrlDir(xml) { dir in
+            let result = extract(in: dir)
+            #expect(result.method == "not_found")
+            #expect(result.operatingProfit == nil)
+        }
+    }
+
     @Test func testNotFound() {
         let xml = XBRLTestSupport.makeXbrlDuration("")
         XBRLTestSupport.withXbrlDir(xml) { dir in
