@@ -29,14 +29,14 @@ struct FilingDocCandidate: Equatable, Sendable {
 }
 
 /// 取り込み候補（保持窓内。docID・4桁コード・提出日時・yearRank）と、保持窓を超えた既存書類の docID（purge 対象）。
-struct FilingSectionCandidateSets {
+struct AnnualReportCandidateSets {
     let keep: [FilingDocCandidate]
     let purge: [String]
 }
 
 /// 会社有報（120・府令010）の候補書類一覧を 1 回だけ読む。対象府令・書類種別は SQL で絞る。
-/// ステージ間で候補集合を共有するときはこの一覧を `filingSectionCandidates(docs:...)` へ渡すと
-/// DB 再往復しない。保持窓（社ごと直近 N 件）と purge は `filingSectionCandidates` が
+/// ステージ間で候補集合を共有するときはこの一覧を `annualReportCandidates(docs:...)` へ渡すと
+/// DB 再往復しない。保持窓（社ごと直近 N 件）と purge は `annualReportCandidates` が
 /// この一覧の上で決める。種類・府令以外の行は SQL で落とす（全表 hydrate しない）。
 func annualReportDisclosureDocs(db: Database, logger: Logger? = nil) async throws
     -> [EdinetDocumentListing]
@@ -56,21 +56,21 @@ func annualReportDisclosureDocs(db: Database, logger: Logger? = nil) async throw
 /// `explicitDocIDs` を渡すと keep をその有報 docID だけにし、purge はしない（`--doc-ids`。
 /// 訂正がある会社-FY だけの再 ingest 用。保持窓の外でも指定 doc は残す）。
 /// `sec_code` が空の行は master の EDINETコード→証券コードで発行体を特定する。
-func filingSectionCandidates(
+func annualReportCandidates(
     db: Database, listedCodes: Set<String>, explicitCodes: Set<String>? = nil, years: Int,
     logger: Logger? = nil, explicitDocIDs: Set<String>? = nil
-) async throws -> FilingSectionCandidateSets {
-    await filingSectionCandidates(
+) async throws -> AnnualReportCandidateSets {
+    await annualReportCandidates(
         docs: try annualReportDisclosureDocs(db: db, logger: logger),
         listedCodes: listedCodes, explicitCodes: explicitCodes, years: years,
         explicitDocIDs: explicitDocIDs)
 }
 
 /// `annualReportDisclosureDocs` の読み済み一覧から候補集合を組み立てる（DB 再往復なし）。
-func filingSectionCandidates(
+func annualReportCandidates(
     docs: [EdinetDocumentListing], listedCodes: Set<String>, explicitCodes: Set<String>? = nil,
     years: Int, explicitDocIDs: Set<String>? = nil
-) async -> FilingSectionCandidateSets {
+) async -> AnnualReportCandidateSets {
     let listedSecByEdinet = await listedSecCodeByEdinetCode()
 
     // 4 桁コードごとに会社有報をまとめる。secCode は 5 桁（4 桁＋種別 1 桁 "0"）。
@@ -115,12 +115,12 @@ func filingSectionCandidates(
             if $0.submitDateTime != $1.submitDateTime { return $0.submitDateTime > $1.submitDateTime }
             return $0.docID < $1.docID
         }
-        return FilingSectionCandidateSets(keep: selected, purge: [])
+        return AnnualReportCandidateSets(keep: selected, purge: [])
     }
     keep.sort {
         if $0.yearRank != $1.yearRank { return $0.yearRank < $1.yearRank }
         if $0.submitDateTime != $1.submitDateTime { return $0.submitDateTime > $1.submitDateTime }
         return $0.docID < $1.docID
     }
-    return FilingSectionCandidateSets(keep: keep, purge: purge)
+    return AnnualReportCandidateSets(keep: keep, purge: purge)
 }
