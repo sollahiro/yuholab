@@ -15,6 +15,9 @@ struct OperatingProfitResult {
 
 enum OperatingProfitExtractor {
 
+    /// 売上高 − 売上原価 − 販管費で算出した営業利益相当の `op_label`（会社開示の営業利益・事業利益と区別する）。
+    static let computedOperatingProfitLabel = "営業利益（算出）"
+
     static func extract(
         fieldSet: FieldSet, accountingStandard: String,
         sgaTagPolicy: SgaTagPolicy = .all
@@ -87,6 +90,42 @@ enum OperatingProfitExtractor {
                 method: "computed",
                 accountingStandard: accountingStandard
             )
+        }
+
+        // 計算法（売上原価・販管費型）: IFRS で営業利益・売上総利益のタグ行が無い PL
+        // （日本ハム 2282 S100YEEQ: 売上高 − 売上原価 − 販管費 − その他の収益・費用 − 金融損益 − 持分法 → 税引前）。
+        // 売上総利益の計算法と同じ売上・原価タグで 売上高 − 売上原価 − 販管費 を営業利益相当とする。
+        // 会社開示の事業利益（為替差損益・IFRS 調整を加味したもの）とは別物なので、ラベルで算出値と区別する。
+        // 売上・原価・販管費の3つが揃う年だけ（売上原価の欠測を 0 にしない）。
+        // 性質別表示の PL（HOYA・デジタルガレージ）は売上原価か販管費の行が無く、ここに入らない。
+        if accountingStandard == "IFRS" {
+            // 売上は本表（PL）の売上収益タグだけ。主要な経営指標等（SummaryOfBusinessResults / KeyFinancialData）の
+            // 売上は、PL の「収益計」が金融収益・持分法益を含む会社（デジタルガレージ）で営業利益を誤算するため使わない。
+            let sales = resolveItem(fieldSet, tags: Xbrl.grossProfitSalesTags.filter {
+                !$0.hasSuffix("SummaryOfBusinessResults") && !$0.hasSuffix("KeyFinancialData")
+            })
+            let costs = resolveItem(fieldSet, tags: Xbrl.grossProfitCostsTags)
+            if sales.tag != nil, costs.tag != nil {
+                let sga = resolveSGA(fieldSet, policy: sgaTagPolicy)
+                func derive(_ s: Double?, _ c: Double?, _ g: Double?) -> Double? {
+                    guard let s, let c, let g else { return nil }
+                    return s - c - g
+                }
+                let current = derive(sales.current, costs.current, sga.current)
+                let prior = derive(sales.prior, costs.prior, sga.prior)
+                if current != nil || prior != nil {
+                    return OperatingProfitResult(
+                        operatingProfit: current,
+                        operatingProfitPrior: prior,
+                        sga: sga.current,
+                        sgaPrior: sga.prior,
+                        sgaLabel: sga.label,
+                        label: computedOperatingProfitLabel,
+                        method: "computed_sales_cost_sga",
+                        accountingStandard: accountingStandard
+                    )
+                }
+            }
         }
 
         // 経常利益フォールバック（J-GAAP 銀行等。保険は上で return 済み）。
