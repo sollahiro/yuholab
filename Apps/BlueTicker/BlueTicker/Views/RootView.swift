@@ -16,6 +16,7 @@ struct RootView: View {
         TabView(selection: $tab) {
             NavigationStack(path: $searchPath) {
                 TopView(query: $searchQuery, feed: feedSession)
+                    .readableWidth()
                     .navigationDestination(for: CompanyRef.self, destination: ticker)
             }
             .toolbarTitleDisplayMode(.inline)
@@ -24,6 +25,7 @@ struct RootView: View {
 
             NavigationStack(path: $listPath) {
                 WatchlistView(path: $listPath)
+                    .readableWidth()
                     .navigationDestination(for: CompanyRef.self, destination: ticker)
             }
             .toolbarTitleDisplayMode(.inline)
@@ -32,11 +34,13 @@ struct RootView: View {
 
             NavigationStack(path: $comparePath) {
                 CompareView()
+                    .readableWidth()
                     .navigationDestination(for: CompareRoute.self) { route in
                         switch route {
                         case .group(let id):
                             if let group = BenchmarkCatalog.group(id: id) {
                                 BenchmarkRankingView(group: group, path: $comparePath)
+                                    .readableWidth()
                             }
                         }
                     }
@@ -75,5 +79,6 @@ struct RootView: View {
 
     private func ticker(_ company: CompanyRef) -> some View {
         TickerView(company: company)
+            .readableWidth()
     }
 }
