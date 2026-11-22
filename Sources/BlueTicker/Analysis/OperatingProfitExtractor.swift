@@ -15,9 +15,6 @@ struct OperatingProfitResult {
 
 enum OperatingProfitExtractor {
 
-    /// 売上高 − 売上原価 − 販管費で算出した営業利益相当の `op_label`（会社開示の営業利益・事業利益と区別する）。
-    static let computedOperatingProfitLabel = "営業利益（算出）"
-
     static func extract(
         fieldSet: FieldSet, accountingStandard: String,
         sgaTagPolicy: SgaTagPolicy = .all
@@ -95,7 +92,8 @@ enum OperatingProfitExtractor {
         // 計算法（売上原価・販管費型）: IFRS で営業利益・売上総利益のタグ行が無い PL
         // （日本ハム 2282 S100YEEQ: 売上高 − 売上原価 − 販管費 − その他の収益・費用 − 金融損益 − 持分法 → 税引前）。
         // 売上総利益の計算法と同じ売上・原価タグで 売上高 − 売上原価 − 販管費 を営業利益相当とする。
-        // 会社開示の事業利益（為替差損益・IFRS 調整を加味したもの）とは別物なので、ラベルで算出値と区別する。
+        // 会社開示の事業利益（為替差損益・IFRS 調整を加味したもの）とは別物。ラベルは既存の計算法と同じ「営業利益」で、
+        // 算出値かどうかは method（computed_sales_cost_sga）で区別する。
         // 売上・原価・販管費の3つが揃う年だけ（売上原価の欠測を 0 にしない）。
         // 性質別表示の PL（HOYA・デジタルガレージ）は売上原価か販管費の行が無く、ここに入らない。
         if accountingStandard == "IFRS" {
@@ -120,7 +118,7 @@ enum OperatingProfitExtractor {
                         sga: sga.current,
                         sgaPrior: sga.prior,
                         sgaLabel: sga.label,
-                        label: computedOperatingProfitLabel,
+                        label: "営業利益",
                         method: "computed_sales_cost_sga",
                         accountingStandard: accountingStandard
                     )

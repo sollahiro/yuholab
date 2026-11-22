@@ -280,7 +280,7 @@ import Foundation
         XBRLTestSupport.withXbrlDir(xml) { dir in
             let result = extract(in: dir)
             #expect(result.method == "computed_sales_cost_sga")
-            #expect(result.label == OperatingProfitExtractor.computedOperatingProfitLabel)
+            #expect(result.label == "営業利益")
             #expect(result.accountingStandard == "IFRS")
             #expect(result.operatingProfit == 57_600_000_000)
             #expect(result.operatingProfitPrior == 36_383_000_000)
