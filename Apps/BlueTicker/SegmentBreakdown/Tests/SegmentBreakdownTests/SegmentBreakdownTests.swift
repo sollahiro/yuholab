@@ -253,12 +253,13 @@ import Testing
         // 組の行に「再編」「終了」の印は出ない。
         let marks = layout.bars.joined().filter { ["BULK", "OTH", "RE", "AUTO", "DRY", "ENE", "STDOTH"].contains($0.key) }.map(\.mark)
         #expect(marks.allSatisfy { $0 == .none })
-        // 帯は、航空運送の系列 1 本 + 組の 1 本。
-        #expect(layout.ribbons.count == 2)
-        let group = try #require(layout.ribbons.first { $0.colorIndex < 0 })
+        // 帯は、航空運送の系列 1 本 + 組の切り分け（旧区分の色）。組の帯は旧区分の範囲を隙間なく覆う。
+        let groupSlices = layout.ribbons.filter { $0.key.hasPrefix("group|") }
+        #expect(layout.ribbons.count == 1 + groupSlices.count)
+        #expect(groupSlices.allSatisfy { $0.colorIndex >= 0 })
         let oldBars = layout.bars[0].filter { ["BULK", "OTH", "RE"].contains($0.key) }
-        #expect(abs(group.leftTop - (oldBars.map(\.y).min() ?? -1)) < 1e-9)
-        #expect(abs(group.leftBottom - (oldBars.map { $0.y + $0.height }.max() ?? -1)) < 1e-9)
+        #expect(abs((groupSlices.map(\.leftTop).min() ?? 0) - (oldBars.map(\.y).min() ?? -1)) < 1e-9)
+        #expect(abs((groupSlices.map(\.leftBottom).max() ?? 0) - (oldBars.map { $0.y + $0.height }.max() ?? -1)) < 1e-9)
     }
 
     // 日本郵船 9101（本番 API 2026-11）: FY2025 に split（不定期専用船 → 3 区分）と merge（その他の事業＋不動産 → その他）。
