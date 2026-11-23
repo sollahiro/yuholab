@@ -24,7 +24,8 @@ struct DualTickerView: View {
             if let company, pickingSide != side {
                 RegularTickerPane(
                     company: company, layout: .single, mode: .dual,
-                    onSetMode: nil,
+                    // モード切替は左ペインだけに出す（選択中の「2つ表示」を押すと一覧＋詳細へ戻る）。
+                    onSetMode: side == .left ? { mode in model.update(tab) { $0.mode = mode } } : nil,
                     onBack: nil,
                     onSearch: { pickingSide = side })
                     .id(company.code)
@@ -38,7 +39,7 @@ struct DualTickerView: View {
                 .strokeBorder(Theme.accent.opacity(focused ? 0.45 : 0), lineWidth: 1.5)
                 .allowsHitTesting(false)
         }
-        .overlay(alignment: .topTrailing) {
+        .overlay(alignment: .bottomLeading) {
             if focused {
                 Text("操作中")
                     .font(.system(size: 9, weight: .bold))

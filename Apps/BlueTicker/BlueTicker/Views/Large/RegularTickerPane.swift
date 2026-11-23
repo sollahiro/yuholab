@@ -49,7 +49,7 @@ struct RegularTickerPane: View {
 
     /// 幅が足りないペインでは 2 列にしない。
     private var effectiveLayout: AnalysisLayout {
-        layout == .twoColumn && width < 560 ? .single : layout
+        layout == .twoColumn && width < 640 ? .single : layout
     }
 
     private var header: some View {
