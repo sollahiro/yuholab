@@ -96,6 +96,16 @@ import Testing
         #expect(classify(sentences) == breakdownNotApplicableDomesticDominant90pct)
     }
 
+    /// 空の余白セルがあっても、中身のあるセルが1つだけなら地の文（6549 の型）。
+    @Test func omissionSentenceInTableWithEmptySpacerCellIsKept() {
+        let html = """
+            <table><tbody><tr><td/></tr><tr><td><p>本邦の外部顧客への売上高が損益計算書の売上高の90％を超えるため、記載を省略しております。</p></td></tr></tbody></table>
+            """
+        let sentences = BreakdownExtractor.omissionSentenceSources(in: html)
+            .flatMap(BreakdownExtractor.splitSentences)
+        #expect(classify(sentences) == breakdownNotApplicableDomesticDominant90pct)
+    }
+
     /// 複数セルの表（数値の表）は地の文に混ぜない。
     @Test func multiCellTableIsNotMixedIntoProse() {
         let html = "<p>注記</p><table><tr><td>日本</td><td>本邦の売上高は90％を超える</td></tr></table>"

@@ -903,9 +903,14 @@ enum BreakdownExtractor {
     /// 表のセルを地の文に混ぜない。段落が無い TextBlock は本文全体を1つにする。
     static func omissionSentenceSources(in html: String) -> [String] {
         guard let doc = try? SwiftSoup.parse(html) else { return [html] }
-        // 省略文を 1 セルだけの表（レイアウト用）で包む有報がある（7963 興研）。そのセルは地の文なので残す。
+        // 省略文を 1 セルだけの表（レイアウト用）で包む有報がある（7963 興研）。空の余白行・列があっても
+        // 中身のあるセルが 1 つだけなら、そのセルは地の文なので残す（6549 は先頭に空セルの行がある）。
         for table in (try? doc.select("table"))?.array() ?? [] {
-            if ((try? table.select("td, th"))?.size() ?? 0) == 1 { _ = try? table.unwrap() }
+            let cells = (try? table.select("td, th"))?.array() ?? []
+            let filled = cells.filter {
+                !((try? $0.text()) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+            if filled.count == 1 { _ = try? table.unwrap() }
         }
         _ = try? doc.select("table").remove()
         let paragraphs = (try? doc.select("p"))?.array() ?? []
