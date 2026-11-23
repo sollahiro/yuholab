@@ -28,7 +28,11 @@ struct RegularTickerPane: View {
 
     var body: some View {
         if usesSystemToolbar {
-            NavigationStack { content.modifier(SystemToolbar(pane: self)) }
+            NavigationStack {
+                content
+                    .safeAreaPadding(.horizontal, LargeMetrics.paneEdge)
+                    .modifier(SystemToolbar(pane: self))
+            }
         } else {
             content
         }
@@ -44,7 +48,7 @@ struct RegularTickerPane: View {
                     .lineSpacing(3)
                     .lineLimit(5)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, Theme.cardContentInset + 4)
                     .padding(.bottom, 8)
             }
             AnalysisView(code: company.code, layout: effectiveLayout)
@@ -101,7 +105,7 @@ struct RegularTickerPane: View {
                     label: isWatched ? "リストから削除" : "リストに追加", action: toggleWatch)
             }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, Theme.cardContentInset + 4)
         .padding(.top, 8)
         .padding(.bottom, 8)
     }

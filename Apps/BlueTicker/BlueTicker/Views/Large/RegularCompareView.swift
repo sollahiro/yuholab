@@ -71,7 +71,7 @@ struct RegularCompareView: View {
                         .foregroundStyle(Theme.textMuted)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Theme.cardContentInset)
             .padding(.top, 14)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -81,7 +81,7 @@ struct RegularCompareView: View {
                             .accessibilityAddTraits(.isButton)
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Theme.cardContentInset)
             }
             switch phase {
             case .loading:
@@ -117,7 +117,7 @@ struct RegularCompareView: View {
                     rankingRow(rank: index + 1, company: row.0, value: row.1, maxValue: maxValue, metric: metric)
                 }
             }
-            .padding(.horizontal, 6)
+            .padding(.horizontal, Theme.cardContentInset)
             .padding(.bottom, 12)
         }
     }

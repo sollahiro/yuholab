@@ -52,14 +52,14 @@ struct RegularListView: View {
             Text("あなたの追加した企業")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Theme.textMuted)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Theme.cardContentInset)
                 .padding(.top, 14)
                 .padding(.bottom, 8)
             if watched.isEmpty {
                 Text("銘柄画面から追加できます。")
                     .font(.footnote)
                     .foregroundStyle(Theme.textMuted)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, Theme.cardContentInset)
             }
             ScrollView {
                 LazyVStack(spacing: 0) {
@@ -90,7 +90,7 @@ struct RegularListView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, Theme.cardContentInset)
                         .contextMenu {
                             Button("リストから削除", systemImage: "bookmark.slash", role: .destructive) {
                                 modelContext.delete(item)

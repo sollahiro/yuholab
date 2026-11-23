@@ -24,7 +24,7 @@ struct CompanySearchPanel: View {
                             Text("調べた企業がここに並びます")
                                 .font(.footnote)
                                 .foregroundStyle(Theme.textMuted)
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, Theme.cardContentInset)
                         }
                         ForEach(history) { row($0) }
                     } else {
@@ -36,7 +36,7 @@ struct CompanySearchPanel: View {
                             Text(errorMessage)
                                 .font(.footnote)
                                 .foregroundStyle(Theme.textMuted)
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, Theme.cardContentInset)
                         }
                         ForEach(results) { row(CompanyRef($0)) }
                     }
@@ -74,7 +74,7 @@ struct CompanySearchPanel: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(Theme.control, in: Capsule())
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Theme.cardContentInset)
         .padding(.top, 8)
         .padding(.bottom, 8)
     }
@@ -83,7 +83,7 @@ struct CompanySearchPanel: View {
         Text(text)
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(Theme.textMuted)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Theme.cardContentInset)
             .padding(.vertical, 6)
     }
 
@@ -113,7 +113,7 @@ struct CompanySearchPanel: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 6)
+        .padding(.horizontal, Theme.cardContentInset)
     }
 
     private func schedule(_ raw: String, debounce: Duration) {

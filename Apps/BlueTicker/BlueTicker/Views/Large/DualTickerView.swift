@@ -18,8 +18,14 @@ struct DualTickerView: View {
             // 標準の ArrangementView（iOS 27.1+）。画面の向きに応じて左右／上下に分け、折り目（division の予約領域）と
             // 余白を自動で避ける。ナビゲーションは外側（TabView）に置く。
             ArrangementView(
-                primary: { tickerPane(pane.company, side: .left, focused: pane.focus == .left, edgeMargin: 0) },
-                secondary: { tickerPane(pane.second, side: .right, focused: pane.focus == .right, edgeMargin: 0) }
+                primary: {
+                    tickerPane(pane.company, side: .left, focused: pane.focus == .left, edgeMargin: 0)
+                        .safeAreaPadding(.leading, LargeMetrics.paneEdge)
+                },
+                secondary: {
+                    tickerPane(pane.second, side: .right, focused: pane.focus == .right, edgeMargin: 0)
+                        .safeAreaPadding(.trailing, LargeMetrics.paneEdge)
+                }
             )
             .arrangementViewStyle(.split)
         } else {
@@ -82,7 +88,7 @@ struct DualTickerView: View {
                         .font(.subheadline)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Theme.cardContentInset)
             .padding(.top, 12)
             .padding(.bottom, 8)
             CompanySearchPanel(query: $query, selectedCode: nil) { company in

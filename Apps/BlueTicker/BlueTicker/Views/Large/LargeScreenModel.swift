@@ -108,6 +108,14 @@ enum SideControls {
 }
 
 
+/// 大画面の左右の余白をそろえるための定数。要素の端の余白は `Theme.cardContentInset`（12pt）に統一し、
+/// ペインの外側に `paneEdge`（8pt）を足して、画面の端から 20pt（iOS 27.1 の `contentMargins(for: .container)` の
+/// leading 値と同じ）にする。レール側の safe area はこれとは別にシステムが確保する。
+/// 左右の端だけに足す（ペイン間は足さない）。通常の iPhone（compact）には使わない。
+enum LargeMetrics {
+    static let paneEdge: CGFloat = 8
+}
+
 /// 一覧（プライマリ）と詳細（セカンダリ）の 2 ペイン。iOS 27.1 以降は標準の `ArrangementView`（`.split`）で、
 /// 向きに応じた左右／上下の分割と、折り目・余白の回避をシステムに任せる。それ以前は自前の左右分割（固定幅）。
 struct AdaptiveSplit<Primary: View, Secondary: View>: View {
@@ -121,15 +129,15 @@ struct AdaptiveSplit<Primary: View, Secondary: View>: View {
         if #available(iOS 27.1, *) {
             // 分割比は、プライマリ側のビューに付けて伝える（ArrangementView 自体ではなく）。
             ArrangementView(
-                primary: { primary.splitArrangementLayoutRatio(ratio) },
-                secondary: { secondary }
+                primary: { primary.splitArrangementLayoutRatio(ratio).safeAreaPadding(.leading, LargeMetrics.paneEdge) },
+                secondary: { secondary.safeAreaPadding(.trailing, LargeMetrics.paneEdge) }
             )
             .arrangementViewStyle(.split)
         } else {
             HStack(spacing: 0) {
-                primary.frame(width: fallbackWidth)
+                primary.safeAreaPadding(.leading, LargeMetrics.paneEdge).frame(width: fallbackWidth)
                 Divider().overlay(Color.white.opacity(0.08))
-                secondary.frame(maxWidth: .infinity)
+                secondary.safeAreaPadding(.trailing, LargeMetrics.paneEdge).frame(maxWidth: .infinity)
             }
         }
     }
