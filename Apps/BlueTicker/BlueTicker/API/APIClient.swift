@@ -108,6 +108,17 @@ actor APIClient {
         return notFoundReasons[url.absoluteString]
     }
 
+    /// 最新の地域別内訳が 404 のとき、開示の省略を表す理由（`domestic_dominant_90pct` / `no_overseas_sales`）。
+    /// 省略以外の欠測（`not_found` / `unknown` など）や取得失敗は nil（理由が言えないのでカードを出さない）。
+    func geographyOmissionReason(code: String) async -> String? {
+        guard (try? await breakdown(code: code, axis: "geography")) == nil,
+            let url = try? queryURL("v1/companies/\(code)/breakdown", [("axis", "geography")]),
+            let reason = notFoundReasons[url.absoluteString],
+            reason == "domestic_dominant_90pct" || reason == "no_overseas_sales"
+        else { return nil }
+        return reason
+    }
+
     /// 内訳（`axis` は `segment` / `geography`）。`docId` を省くと最新の有報。
     func breakdown(code: String, axis: String, docId: String? = nil) async throws -> BreakdownResponse {
         var items = [("axis", axis)]
