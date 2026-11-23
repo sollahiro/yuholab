@@ -8,6 +8,7 @@ struct TickerView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.hasSideControls) private var hasSideControls
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Query private var watched: [WatchedCompany]
     @State private var resolvedSector = ""
     @State private var showsCompanyCard = false
@@ -113,7 +114,9 @@ struct TickerView: View {
 
     /// ツールバーが側面にある画面（Duo の外側・内側）では、社名ピルを使わず、見出しと Overview を本文の先頭に常に出す。
     private var usesInlineHeader: Bool {
-        horizontalSizeClass == .regular || hasSideControls
+        // 横向きの iPhone（高さが compact）は、ナビバーが低く、ボタンの位置とピルの測定がずれて重なることがある。
+        // ピルをやめ、見出し+Overview を本文の先頭に出す（標準のバー配置に任せる）。
+        horizontalSizeClass == .regular || hasSideControls || verticalSizeClass == .compact
     }
 
     /// アイコン・社名・コード/業種の見出しと、Overview（最大 5 行）。分析カードの手前に常に出す。
