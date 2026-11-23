@@ -108,6 +108,23 @@ actor APIClient {
         return notFoundReasons[url.absoluteString]
     }
 
+    /// 最新の地域別内訳が 404 のときの理由。省略は `domestic_dominant_90pct` / `no_overseas_sales`、
+    /// それ以外の 404（未算出・不明）は `unavailable`。取得失敗（通信エラーなど）は nil。
+    func geographyMissingReason(code: String) async -> String? {
+        do {
+            _ = try await breakdown(code: code, axis: "geography")
+            return nil
+        } catch APIClientError.http(let status, _) where status == 404 {
+            guard let url = try? queryURL("v1/companies/\(code)/breakdown", [("axis", "geography")]),
+                let reason = notFoundReasons[url.absoluteString],
+                reason == "domestic_dominant_90pct" || reason == "no_overseas_sales"
+            else { return "unavailable" }
+            return reason
+        } catch {
+            return nil
+        }
+    }
+
     /// 内訳（`axis` は `segment` / `geography`）。`docId` を省くと最新の有報。
     func breakdown(code: String, axis: String, docId: String? = nil) async throws -> BreakdownResponse {
         var items = [("axis", axis)]

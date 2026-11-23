@@ -2,8 +2,8 @@ import SwiftUI
 
 /// 銘柄ページの「セグメント」「地域」カード。収益構造の次に並べる。
 /// セグメントは `/waterfall/segment`（外部売上の年次推移）と `/breakdown?axis=segment`（最新期の利益）、
-/// 地域は `/breakdown?axis=geography` を年ごとに取る。取れない会社（単一セグメント・未算出・地域が
-/// セグメントそのもの）ではカードを出さない。
+/// 地域は `/breakdown?axis=geography` を年ごとに取る。取れない会社は、単一セグメント・地域の開示省略（理由つき）
+/// ではその旨のカードを出し、未算出・地域がセグメントそのものの会社ではカードを出さない。
 struct BreakdownSections: View {
     /// 読み込み前・取得失敗は nil。読み込みは親が持つ（中身が空の View に付けた `.task` は動かないため）。
     var model: BreakdownModel?
@@ -17,6 +17,8 @@ struct BreakdownSections: View {
             }
             if let region = model?.region {
                 RegionCard(model: region)
+            } else if let reason = model?.regionOmission {
+                RegionOmittedCard(reason: reason)
             }
         }
     }
@@ -41,6 +43,10 @@ struct BreakdownModel {
     var region: RegionCardModel?
     /// 単一セグメントの会社（セグメントの内訳が無い）。カードに「単一セグメント」と出す。
     var singleSegment = false
+    /// 地域のカードが組めない会社の理由（内訳 API の 404 reason。省略以外は `unavailable`）。カードに省略・未取得の旨を出す。
+    var regionOmission: String?
+    /// 地域がセグメントそのもの（セグメントカードで足りる）ので、地域カードは出さない。
+    var regionIsSegment = false
 
     /// 直近 5 年（取れる分だけ）。
     static let years = 5
@@ -48,6 +54,20 @@ struct BreakdownModel {
     /// 失敗や 404 はカードを出さないだけ（分析ページ全体のエラーにしない）。
     /// 取れたところから `update` で順に渡す（セグメントの棒 → 利益 → 地域）。全部そろうのを待たない。
     static func load(code: String, update: @MainActor (BreakdownModel) -> Void) async {
+        var latest = BreakdownModel()
+        await loadCards(code: code) { model in
+            latest = model
+            update(model)
+        }
+        // 地域のカードが組めなかった会社は、省略の理由、または未取得の旨のカードを出す。
+        guard latest.region == nil, !latest.regionIsSegment,
+            let reason = await APIClient.shared.geographyMissingReason(code: code)
+        else { return }
+        latest.regionOmission = reason
+        await update(latest)
+    }
+
+    private static func loadCards(code: String, update: @MainActor (BreakdownModel) -> Void) async {
         // 利益（最新期）は積み上げの取得を待たずに始める。
         async let detail = try? APIClient.shared.breakdown(code: code, axis: "segment")
         guard let waterfall = try? await APIClient.shared.segmentWaterfall(code: code, years: years) else {
@@ -103,7 +123,9 @@ struct BreakdownModel {
                 region = regionModel(waterfall: waterfall, responses: responses)
             }
         }
-        await update(BreakdownModel(segment: segment, region: region))
+        var final = BreakdownModel(segment: segment, region: region)
+        final.regionIsSegment = geographic
+        await update(final)
     }
 
     /// 内訳 API が単一セグメントと返す理由。
@@ -168,6 +190,31 @@ private struct SingleSegmentCard: View {
                 .font(.headline)
                 .foregroundStyle(Theme.text)
             AnalysisNote(text: "この会社は報告セグメントが1つ（または省略）のため、セグメント別の内訳はありません。")
+        }
+    }
+}
+
+/// 地域ごとの情報を有報が省略している会社。理由は有報の記載（内訳 API の reason）に沿う。
+private struct RegionOmittedCard: View {
+    var reason: String
+
+    private var note: String {
+        switch reason {
+        case "unavailable":
+            return "地域別売上高は未取得です。"
+        case "domestic_dominant_90pct":
+            return "本邦の外部顧客への売上高が連結売上高の90%を超えるため、有価証券報告書では地域ごとの売上高を開示していません。"
+        default:
+            return "本邦以外の外部顧客への売上高がないため、有価証券報告書では地域ごとの売上高を開示していません。"
+        }
+    }
+
+    var body: some View {
+        AnalysisCard(title: "地域別売上高") {
+            Text(reason == "unavailable" ? "未取得" : "地域別の開示なし")
+                .font(.headline)
+                .foregroundStyle(Theme.text)
+            AnalysisNote(text: note)
         }
     }
 }
