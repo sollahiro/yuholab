@@ -45,14 +45,6 @@ struct AnalysisView: View {
         }
     }
 
-    /// 全画面の 1 行。左右を同じ幅にして、上端をそろえる。
-    private func pairRow<Left: View, Right: View>(_ left: Left, _ right: Right) -> some View {
-        HStack(alignment: .top, spacing: Theme.cardContentInset) {
-            left.frame(maxWidth: .infinity)
-            right.frame(maxWidth: .infinity)
-        }
-    }
-
     private func content(_ response: FinancialsResponse) -> some View {
         let years = Format.chronological(response.years)
         let currency = response.currency ?? Format.latestYear(response.years)?.currency
@@ -84,52 +76,58 @@ struct AnalysisView: View {
                 }
                 .padding(Theme.cardContentInset)
             case .waterfall:
-                // 全画面: 既存の分析カードを同じ幅で 2 列に並べる。左にグラフ（既存カード）、右にそれぞれの数値の表。
+                let b = FullCardBuilder(years: years, currency: currency)
+                // 全画面: グラフ（左）と数値の表（右）を 1 枚のカードにまとめ、同じ幅のカードを縦に並べる。
                 VStack(spacing: Theme.cardContentInset) {
-                    pairRow(
+                    b.mergedCard(
                         PerformanceSection(years: years, currency: currency),
-                        NumberTableCard(title: "業績の数値", years: years, rows: [
-                            .init("売上高") { Format.autoYen($0.sales, currency: currency) },
-                            .init("営業利益") { Format.autoYen($0.operatingProfit, currency: currency) },
-                            .init("純利益") { Format.autoYen($0.netProfit, currency: currency) },
-                        ]))
-                    pairRow(
+                        rows: [
+                            b.amountRow("売上高") { $0.sales },
+                            b.amountRow("営業利益") { $0.operatingProfit },
+                            b.amountRow("純利益") { $0.netProfit },
+                        ])
+                    b.mergedCard(
                         BusinessProfitSection(years: years, currency: currency),
-                        NumberTableCard(title: "収益構造の数値", years: years, rows: [
-                            .init("事業利益") { Format.autoYen($0.businessProfit, currency: currency) },
-                            .init("利益率") { Format.percent($0.businessProfitMargin) },
-                            .init("前年差") { Format.autoYen($0.businessProfitChange, currency: currency) },
-                            .init("売上要因") { Format.autoYen($0.salesChangeImpact, currency: currency) },
-                            .init("利益率要因") { Format.autoYen($0.grossMarginChangeImpact, currency: currency) },
-                            .init("販管費要因") { Format.autoYen($0.sgaChangeImpact, currency: currency) },
-                        ]))
+                        rows: [
+                            b.amountRow("事業利益") { $0.businessProfit },
+                            b.percentRow("利益率") { $0.businessProfitMargin },
+                            b.amountRow("前年差") { $0.businessProfitChange },
+                            b.amountRow("売上要因") { $0.salesChangeImpact },
+                            b.amountRow("利益率要因") { $0.grossMarginChangeImpact },
+                            b.amountRow("販管費要因") { $0.sgaChangeImpact },
+                        ])
                     BreakdownSections(model: breakdown)
-                    pairRow(
+                    b.mergedCard(
                         CapitalEfficiencySection(years: years),
-                        NumberTableCard(title: "資本効率の数値", years: years, rows: [
-                            .init("ROE") { Format.percent($0.roe) },
-                            .init("ROIC") { Format.percent($0.roic) },
-                            .init("純利益率") { Format.percent($0.netMargin) },
-                            .init("総資産回転率") { Format.times($0.assetTurnover) },
-                            .init("財務レバレッジ") { Format.times($0.financialLeverage) },
-                        ]))
-                    pairRow(
+                        rows: [
+                            b.percentRow("ROE") { $0.roe },
+                            b.percentRow("ROIC") { $0.roic },
+                            b.percentRow("純利益率") { $0.netMargin },
+                            b.timesRow("総資産回転率") { $0.assetTurnover },
+                            b.timesRow("財務レバレッジ") { $0.financialLeverage },
+                        ])
+                    b.mergedCard(
                         CashAllocationSection(years: years, currency: currency),
-                        NumberTableCard(title: "資金配分の数値", years: years, rows: [
-                            .init("フリーCF") { Format.autoYen($0.cfc, currency: currency) },
-                            .init("財務CF") { Format.autoYen($0.cff, currency: currency) },
-                            .init("現金の増減") { Format.autoYen($0.cfCashChange, currency: currency) },
-                            .init("ネットキャッシュ") { Format.autoYen($0.netCash, currency: currency) },
-                        ]))
-                    pairRow(
+                        rows: [
+                            b.amountRow("フリーCF") { $0.cfc },
+                            b.amountRow("借入の増減") { $0.cfDebtChange },
+                            b.amountRow("配当") { $0.cfDividendsParent },
+                            b.amountRow("自己株式取得") { $0.cfBuyback },
+                            b.amountRow("財務CF") { $0.cff },
+                            b.amountRow("現金の増減") { $0.cfCashChange },
+                            b.amountRow("ネットキャッシュ") { $0.netCash },
+                        ])
+                    b.mergedCard(
                         ProductivitySection(years: years, currency: currency),
-                        NumberTableCard(title: "労働生産性の数値", years: years, rows: [
-                            .init("従業員数") { year in year.employees.map { Format.groupedNumber(Double($0)) + "人" } ?? "—" },
-                            .init("1人あたり売上高") { year in
-                                guard let sales = year.sales, let employees = year.employees, employees > 0 else { return "—" }
-                                return Format.autoYen(sales / Double(employees), currency: currency)
+                        rows: [
+                            .init("従業員数", unit: "人") { year in
+                                year.employees.map { Format.groupedNumber(Double($0)) } ?? "—"
                             },
-                        ]))
+                            b.amountRow("1人あたり売上高") { year in
+                                guard let sales = year.sales, let employees = year.employees, employees > 0 else { return nil }
+                                return sales / Double(employees)
+                            },
+                        ])
                 }
                 .padding(Theme.cardContentInset)
             }
@@ -156,50 +154,102 @@ struct AnalysisView: View {
     }
 }
 
+/// 全画面の合体カード（左=グラフ、右=数値の表）の組み立て。
+private struct FullCardBuilder {
+    var years: [FinancialsYear]
+    var currency: String?
+
+    /// 全画面の 1 枚。左にグラフ（既存のカード）、右に数値の表を、1 枚のカードにまとめる。
+    func mergedCard<Chart: View>(_ chart: Chart, rows: [NumberTableCard.Row]) -> some View {
+        HStack(alignment: .top, spacing: 28) {
+            chart
+                .frame(maxWidth: .infinity)
+            NumberTableCard(years: years, rows: rows)
+                .frame(maxWidth: .infinity)
+        }
+        .environment(\.analysisCardChrome, false)
+        .environment(\.analysisWide, true)
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .bltCardSurface()
+    }
+
+    func amountRow(_ label: String, _ value: @escaping (FinancialsYear) -> Double?) -> NumberTableCard.Row {
+        let scale = Format.commonScale(for: years.map(value), currency: currency)
+        return .init(label, unit: scale?.unit ?? "") { year in
+            guard let scale else { return "—" }
+            return Format.scaledYen(value(year), scale: scale)
+        }
+    }
+
+    func percentRow(_ label: String, _ value: @escaping (FinancialsYear) -> Double?) -> NumberTableCard.Row {
+        .init(label, unit: "%") { Format.percent(value($0), includeUnit: false) }
+    }
+
+    func timesRow(_ label: String, _ value: @escaping (FinancialsYear) -> Double?) -> NumberTableCard.Row {
+        .init(label, unit: "倍") { Format.times(value($0), includeUnit: false) }
+    }
+
+}
+
 // MARK: - 数値の表（全画面）
 
-/// グラフの横に置く数値の表。年を列、項目を行にする。
+/// グラフの横に置く数値の表。年を列、項目を行にする。単位は項目名の下に小さく出し、数値は数字だけにして狭い幅に収める。
 private struct NumberTableCard: View {
     struct Row: Identifiable {
         var label: String
+        var unit: String
         var value: (FinancialsYear) -> String
         var id: String { label }
 
-        init(_ label: String, value: @escaping (FinancialsYear) -> String) {
+        init(_ label: String, unit: String, value: @escaping (FinancialsYear) -> String) {
             self.label = label
+            self.unit = unit
             self.value = value
         }
     }
 
-    var title: String
     var years: [FinancialsYear]
     var rows: [Row]
 
     var body: some View {
-        AnalysisCard(title: title) {
-            Grid(alignment: .trailing, horizontalSpacing: 10, verticalSpacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("数値")
+                .font(.title3.bold())
+                .foregroundStyle(Theme.text)
+            Grid(alignment: .trailing, horizontalSpacing: 6, verticalSpacing: 8) {
                 GridRow {
                     Text("")
                     ForEach(years) { year in
                         Text(Format.fy(year.fyEnd))
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(Theme.textMuted)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                 }
                 ForEach(rows) { row in
                     Divider().overlay(Color.white.opacity(0.08))
                     GridRow {
-                        Text(row.label)
-                            .font(.caption)
-                            .foregroundStyle(Theme.textMuted)
-                            .lineLimit(2)
-                            .gridColumnAlignment(.leading)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(row.label)
+                                .font(.caption)
+                                .foregroundStyle(Theme.textMuted)
+                                .lineLimit(2)
+                            if !row.unit.isEmpty {
+                                Text(row.unit)
+                                    .font(.caption2)
+                                    .foregroundStyle(Theme.idleTab)
+                            }
+                        }
+                        .frame(width: 84, alignment: .leading)
+                        .gridColumnAlignment(.leading)
                         ForEach(years) { year in
                             Text(row.value(year))
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(Theme.text)
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.7)
+                                .minimumScaleFactor(0.6)
                         }
                     }
                 }
@@ -210,8 +260,31 @@ private struct NumberTableCard: View {
 
 // MARK: - 共通
 
+private struct AnalysisCardChromeKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+private struct AnalysisWideKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// 全画面（広い）表示。資金配分に、財務CF の内訳（借入・配当・自己株式取得）の推移を足す。
+    fileprivate var analysisWide: Bool {
+        get { self[AnalysisWideKey.self] }
+        set { self[AnalysisWideKey.self] = newValue }
+    }
+
+    /// `false` のとき、分析カードの余白と背景を付けない（グラフと表を 1 枚のカードにまとめる全画面表示用）。
+    fileprivate var analysisCardChrome: Bool {
+        get { self[AnalysisCardChromeKey.self] }
+        set { self[AnalysisCardChromeKey.self] = newValue }
+    }
+}
+
 /// 分析の 1 区分。見出しと中身を角丸のカードに載せる。
 struct AnalysisCard<Content: View>: View {
+    @Environment(\.analysisCardChrome) private var chrome
     var title: String
     /// 指定すると、タイトルの右に「i」ボタンを出す。
     var onInfo: (() -> Void)?
@@ -237,9 +310,17 @@ struct AnalysisCard<Content: View>: View {
             }
             content
         }
-        .padding(20)
+        .padding(chrome ? 20 : 0)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .bltCardSurface()
+        .modifier(CardSurfaceIf(enabled: chrome))
+    }
+}
+
+private struct CardSurfaceIf: ViewModifier {
+    var enabled: Bool
+
+    func body(content: Content) -> some View {
+        if enabled { content.bltCardSurface() } else { content }
     }
 }
 
@@ -1336,10 +1417,67 @@ private struct ProductivitySection: View {
 
 /// フリーCF から現金増減までのウォーターフォールと、現金残高の増減（期末の現金の棒・正味現金の折れ線）。
 /// 値は CF の符号（収入が正、支出が負）。換算差額とその他の現金増減は「その他」にまとめる。
+/// 財務 CF の内訳（借入の増減・配当・自己株式取得）を年ごとに並べた棒グラフ。
+private struct FinancingTrendChart: View {
+    var years: [FinancialsYear]
+    var currency: String?
+
+    private struct Point: Identifiable {
+        var year: String
+        var series: String
+        var value: Double
+        var id: String { year + series }
+    }
+
+    private static let series: [(name: String, color: Color)] = [
+        ("借入の増減", ChartStyle.line),
+        ("配当", Theme.negative),
+        ("自己株式取得", Theme.growthTint),
+    ]
+
+    private var scale: Format.YenScale? {
+        Format.commonScale(
+            for: years.flatMap { [$0.cfDebtChange, $0.cfDividendsParent, $0.cfBuyback] }, currency: currency)
+    }
+
+    private var points: [Point] {
+        guard let scale else { return [] }
+        return years.flatMap { year -> [Point] in
+            let label = Format.fy(year.fyEnd)
+            return [
+                year.cfDebtChange.map { Point(year: label, series: "借入の増減", value: $0 / scale.divisor) },
+                year.cfDividendsParent.map { Point(year: label, series: "配当", value: $0 / scale.divisor) },
+                year.cfBuyback.map { Point(year: label, series: "自己株式取得", value: $0 / scale.divisor) },
+            ].compactMap { $0 }
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Chart(points) { point in
+                BarMark(
+                    x: .value("年", point.year),
+                    y: .value("金額", point.value)
+                )
+                .position(by: .value("項目", point.series))
+                .foregroundStyle(by: .value("項目", point.series))
+            }
+            .chartForegroundStyleScale(domain: Self.series.map(\.name), range: Self.series.map(\.color))
+            .chartLegend(.hidden)
+            .frame(height: 150)
+            ChartLegend(items: Self.series.map { LegendItem(title: $0.name, color: $0.color, shape: .bar) })
+            if let scale {
+                AnalysisNote(text: "単位は\(scale.unit)です。")
+            }
+        }
+    }
+}
+
 private struct CashAllocationSection: View {
     var years: [FinancialsYear]
     var currency: String?
     @State private var selectedYearID: String?
+    @Environment(\.analysisWide) private var wide
 
     var body: some View {
         AnalysisCard(title: "資金配分") {
@@ -1352,6 +1490,10 @@ private struct CashAllocationSection: View {
                 ])
             } else {
                 AnalysisNote(text: "ネットキャッシュ・フリーCFは未集計です。")
+            }
+            if wide, years.contains(where: { $0.cfDebtChange != nil || $0.cfDividendsParent != nil || $0.cfBuyback != nil }) {
+                AnalysisSubheading(text: "借入・配当・自己株式取得の推移")
+                FinancingTrendChart(years: years, currency: currency)
             }
             AnalysisSubheading(text: "フリーCFの使い道")
             if selectableYears.isEmpty {
