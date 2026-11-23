@@ -113,7 +113,6 @@ struct AnalysisView: View {
                             b.amountRow("借入の増減") { $0.cfDebtChange },
                             b.amountRow("配当") { $0.cfDividendsParent },
                             b.amountRow("自己株式取得") { $0.cfBuyback },
-                            b.amountRow("財務CF") { $0.cff },
                             b.amountRow("現金の増減") { $0.cfCashChange },
                             b.amountRow("ネットキャッシュ") { $0.netCash },
                         ],
