@@ -62,11 +62,25 @@ struct RootView: View {
             // 開く: 外側で開いていた画面に対応する内側の画面へ。閉じる: 内側の画面に対応する外側の画面へ。
             if regular {
                 large.adoptCompact()
+                // 外側の経路は引き継ぎ済み。古い経路を残すと、次に閉じたとき compact の NavigationStack が
+                // 古い経路を持ったまま作られ、あとから経路を差し替えて「戻る」が効かなくなる。
+                searchPath = NavigationPath()
+                listPath = NavigationPath()
+                comparePath = NavigationPath()
             } else {
                 large.prepareForCompact()
-                searchPath = Self.path(for: large.compactCompany[0])
-                listPath = Self.path(for: large.compactCompany[1])
-                comparePath = NavigationPath([CompareRoute.group(large.compareGroup)])
+                let search = large.compactCompany[0]
+                let list = large.compactCompany[1]
+                let group = large.compareGroup
+                // compact の NavigationStack が作られたあとで積む（作成と同じ更新で経路を入れると、
+                // path と画面の履歴がずれて戻れなくなることがある）。
+                Task { @MainActor in
+                    await Task.yield()
+                    guard !isRegular else { return }
+                    searchPath = Self.path(for: search)
+                    listPath = Self.path(for: list)
+                    comparePath = NavigationPath([CompareRoute.group(group)])
+                }
             }
         }
         .onChange(of: searchPath.count) { _, count in
