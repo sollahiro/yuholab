@@ -180,7 +180,7 @@ tr.cur td{background:#59b3f20f}
   <ul><li>開く: 外側の画面に対応する内側の画面へ。ホーム→ホーム、リスト→リスト、比較→比較。<b>銘柄画面は、ホームから開いていたらホームの右ペイン、リストから開いていたらリストの右ペインで同じ銘柄</b>を開く。</li>
   <li>閉じる: 内側の画面に対応する外側へ。2つ表示のときはフォーカス側の銘柄の銘柄画面。</li></ul>
   <h2>外側</h2>
-  <ul><li><b>現行iOSと同じ中身＋Duo版のタブ</b>: タブは右の縦レール（ホーム/リスト/比較）、ホームはfeed（6社ずつページ送り）、リストは3列タイル、銘柄画面は ‹・社名ピル（タップでOverview）・チャート・ブックマーク。</li></ul>
+  <ul><li><b>現行iOSと同じ中身＋Duo版のタブ</b>: タブは右の縦レール（ホーム/リスト/比較）、ホームはfeed（6社ずつページ送り。ロゴは廃止）、リストは3列タイル、銘柄画面は ‹・社名ピル（タップでOverview）・チャート・ブックマーク。</li></ul>
   <p style="margin-top:14px;font-size:11px">クリックできます: リストの行、右上の表示切替アイコン、ウォーターフォールの棒、2つ表示の検索、比較の指標とピン。</p>
 </div>
 
@@ -221,7 +221,7 @@ tr.cur td{background:#59b3f20f}
 
 <div class="devwrap"><div class="outer">
   <div class="ostack on" id="o-home">
-    <div class="otop"><div class="olog">有報LAB</div><span class="sp"></span><div class="circ" style="width:36px;height:36px;font-size:15px">⌕</div><div class="circ" style="width:36px;height:36px;font-size:15px">◷</div></div>
+    <div class="otop"><span class="sp"></span><div class="circ" style="width:36px;height:36px;font-size:15px">⌕</div><div class="circ" style="width:36px;height:36px;font-size:15px">◷</div></div>
     <div class="pb" id="oHomeBody"></div>
   </div>
   <div class="ostack" id="o-list">
@@ -423,7 +423,7 @@ function renderHome(){
   const el=document.getElementById('s-home');
   if(hsel&&mode!=='single'){el.innerHTML=detailHTML(mode);return}
   const right=hsel?`${hdr(hsel,{back:1,toggle:''})}<div class="pb"><div class="cols">${allCards(hsel,270)}</div></div>`
-   :`<div class="ph" style="padding-top:42px;font-size:17px;color:var(--text);font-weight:700">有報LAB<span style="flex:1"></span></div><div class="pb"><div class="fh"><span>最近有報が更新された企業</span><span class="live"><i></i>更新 11/22 21:00</span></div><div class="card" style="padding:6px 16px;margin-bottom:0">${feedItems.map(([id,d])=>{const c=co_(id);return `<div class="hrow" data-hid="${c.id}"><div class="icon" style="width:36px;height:36px">${c.ic}</div><div style="flex:1;min-width:0"><div class="nm">${c.n}</div><div class="cd">${c.id}</div></div><div class="d"><small>提出日</small>${d}</div><span class="ch">›</span></div>`}).join('')}</div><div class="note" style="text-align:center">約12社 · 2週間分。スクロールで続き（現行は6社ずつのページ送り）</div></div>`;
+   :`<div class="ph" style="padding-top:42px"></div><div class="pb"><div class="fh"><span>最近有報が更新された企業</span><span class="live"><i></i>更新 11/22 21:00</span></div><div class="card" style="padding:6px 16px;margin-bottom:0">${feedItems.map(([id,d])=>{const c=co_(id);return `<div class="hrow" data-hid="${c.id}"><div class="icon" style="width:36px;height:36px">${c.ic}</div><div style="flex:1;min-width:0"><div class="nm">${c.n}</div><div class="cd">${c.id}</div></div><div class="d"><small>提出日</small>${d}</div><span class="ch">›</span></div>`}).join('')}</div><div class="note" style="text-align:center">約12社 · 2週間分。スクロールで続き（現行は6社ずつのページ送り）</div></div>`;
   el.innerHTML=`<div class="pane" style="width:300px;flex:none"><div class="ph" style="padding-bottom:10px"><span style="font-size:17px;color:var(--text);font-weight:700">検索</span><span class="circ" style="width:34px;height:34px;font-size:14px" title="履歴">◷</span></div><div class="sbar">⌕<input id="hin" placeholder="会社名・銘柄コード" value="${hq}"><span id="hclr" style="color:var(--muted);cursor:pointer;${hq?'':'display:none'}">⊗</span></div><div class="pb" id="hres">${homeLeft()}</div></div><div class="vsep"></div><div class="pane" style="flex:1">${right}</div>`;
   const inp=document.getElementById('hin');
   inp.oninput=()=>{hq=inp.value;document.getElementById('hres').innerHTML=homeLeft();document.getElementById('hclr').style.display=hq?'':'none'};
