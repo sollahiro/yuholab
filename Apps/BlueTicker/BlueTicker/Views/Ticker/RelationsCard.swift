@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 銘柄ページ最下部の「関係」カード。有報の記載に基づく仕入先・出資先・子会社・大株主を、
+/// 銘柄ページ最下部の「関連企業」カード。有報の記載に基づく仕入先・出資先・子会社・大株主を、
 /// 種別ごとに上位 10 件まで出す。上場企業に名寄せできた相手はタップでその銘柄へ進む。
 /// 取得は選んだ種別だけ（`GET /v1/companies/{code}/relations?type=`）。
 struct RelationsCard: View {
@@ -10,7 +10,7 @@ struct RelationsCard: View {
     @State private var states: [RelationKind: RelationsLoadState] = [:]
 
     var body: some View {
-        AnalysisCard(title: "関係") {
+        AnalysisCard(title: "関連企業") {
             VStack(alignment: .leading, spacing: 12) {
                 Picker("関係の種類", selection: $kind) {
                     ForEach(RelationKind.allCases) { kind in
