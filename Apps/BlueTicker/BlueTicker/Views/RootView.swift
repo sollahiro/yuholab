@@ -28,7 +28,7 @@ struct RootView: View {
                 .tag(1)
 
             compareTab
-                .tabItem { Label("比較", systemImage: "chart.bar") }
+                .tabItem { Label("同業比較", systemImage: "chart.bar") }
                 .tag(2)
         }
         .environment(\.hasSideControls, hasSideControls)

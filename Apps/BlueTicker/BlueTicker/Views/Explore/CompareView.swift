@@ -48,6 +48,6 @@ struct CompareView: View {
             .padding(.top, 8)
             VersionMarkFooter()
         }
-        .bltChrome("比較")
+        .bltChrome("同業比較")
     }
 }
