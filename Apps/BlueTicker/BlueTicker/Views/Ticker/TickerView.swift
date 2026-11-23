@@ -7,6 +7,7 @@ struct TickerView: View {
     var company: CompanyRef
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.hasSideControls) private var hasSideControls
     @Query private var watched: [WatchedCompany]
     @State private var resolvedSector = ""
     @State private var showsCompanyCard = false
@@ -110,9 +111,9 @@ struct TickerView: View {
             .task(id: company.code) { if usesInlineHeader { await loadOverview() } }
     }
 
-    /// 折りたたみ型の画面（Duo の外側・内側）では、社名ピルを使わず、見出しと Overview を本文の先頭に常に出す。
+    /// ツールバーが側面にある画面（Duo の外側・内側）では、社名ピルを使わず、見出しと Overview を本文の先頭に常に出す。
     private var usesInlineHeader: Bool {
-        horizontalSizeClass == .regular || FoldableScreen.isFoldableShape
+        horizontalSizeClass == .regular || hasSideControls
     }
 
     /// アイコン・社名・コード/業種の見出しと、Overview（最大 5 行）。分析カードの手前に常に出す。
@@ -1851,26 +1852,6 @@ private extension UIView {
     }
 }
 
-
-/// 折りたたみ型の画面かどうかの判定（1 か所）。機種名は見ず、画面全体の縦横比で決める。
-/// 向き（縦・横）で変わらないよう、短辺 ÷ 長辺を使う。Duo の外側は約 466×678pt（約 0.69。横向きでも同じ）、
-/// 通常の iPhone は約 0.46〜0.49（横向きでも同じ）。regular 幅（Duo の内側など）は呼び出し側で常に対象にする。
-enum FoldableScreen {
-    static let minimumAspect: CGFloat = 0.6
-
-    static func isFoldableShape(width: CGFloat, height: CGFloat) -> Bool {
-        let longer = max(width, height)
-        guard longer > 0 else { return false }
-        return min(width, height) / longer >= minimumAspect
-    }
-
-    /// 現在の画面全体（Split View などの分割ではなく、画面そのもの）の形。
-    @MainActor
-    static var isFoldableShape: Bool {
-        let bounds = UIScreen.main.bounds
-        return isFoldableShape(width: bounds.width, height: bounds.height)
-    }
-}
 
 /// 銘柄画面の本文先頭の見出し。アイコン・社名・コード/業種と、Overview（最大 5 行）。
 struct CompanyInlineHeader: View {

@@ -82,3 +82,27 @@ final class LargeScreenModel {
         }
     }
 }
+
+
+private struct SideControlsKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// ツールバー・タブバーが画面の側面に縦に並んでいるか（iPhone Duo の外側・内側横向きなど）。
+    /// 機種や画面の縦横比は見ず、ウィンドウの safe area の左右の非対称（片側だけ大きい）で判定する。
+    /// 通常の iPhone は縦向きで左右とも 0、横向きでも左右対称（切り欠き分が同じ）なので対象外になる。
+    var hasSideControls: Bool {
+        get { self[SideControlsKey.self] }
+        set { self[SideControlsKey.self] = newValue }
+    }
+}
+
+enum SideControls {
+    /// 左右の safe area の差がこれ以上なら、側面にコントロールがあるとみなす（pt）。Duo のレールは 84pt。
+    static let asymmetryThreshold: CGFloat = 40
+
+    static func isPresent(_ insets: EdgeInsets) -> Bool {
+        abs(insets.leading - insets.trailing) >= asymmetryThreshold
+    }
+}

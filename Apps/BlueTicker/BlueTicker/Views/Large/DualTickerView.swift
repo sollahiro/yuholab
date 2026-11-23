@@ -14,8 +14,21 @@ struct DualTickerView: View {
 
     var body: some View {
         let pane = model.pane(tab)
-        // 画面の安全領域（safeAreaInsets）に合わせる。端末の角丸や側面のレールで文字・アイコンが欠けないよう、
-        // 左右の端は安全領域の内側、かつ最低限の余白（角丸ぶん）を取る。背景は端まで広げる。
+        if #available(iOS 27.1, *) {
+            // 標準の ArrangementView（iOS 27.1+）。画面の向きに応じて左右／上下に分け、折り目（division の予約領域）と
+            // 余白を自動で避ける。ナビゲーションは外側（TabView）に置く。
+            ArrangementView(
+                primary: { tickerPane(pane.company, side: .left, focused: pane.focus == .left, edgeMargin: 0) },
+                secondary: { tickerPane(pane.second, side: .right, focused: pane.focus == .right, edgeMargin: 0) }
+            )
+            .arrangementViewStyle(.split)
+        } else {
+            fallback(pane)
+        }
+    }
+
+    /// iOS 27.1 より前: 自前の左右分割。左端は safeAreaInsets と最小余白で欠けないようにする。
+    private func fallback(_ pane: LargeScreenModel.Pane) -> some View {
         GeometryReader { proxy in
             let leading = max(proxy.safeAreaInsets.leading, Self.minimumEdgeMargin)
             HStack(spacing: 0) {
@@ -27,7 +40,7 @@ struct DualTickerView: View {
         }
     }
 
-    /// 端末の角丸で文字・アイコンが欠けない最小の左余白。
+    /// 端末の角丸で文字・アイコンが欠けない最小の左余白（フォールバックのみ）。
     private static let minimumEdgeMargin: CGFloat = 14
 
     @ViewBuilder

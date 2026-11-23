@@ -12,6 +12,8 @@ struct RootView: View {
     @State private var feedSession = FeedSession()
     /// 大画面（regular 幅）の状態。開閉・回転でサイズクラスが変わっても失わないよう、ここで持つ。
     @State private var large = LargeScreenModel()
+    /// ツールバー・タブバーが側面にあるか（ウィンドウ全体の safe area の左右差で決める）。
+    @State private var hasSideControls = false
     private let router = IntentRouter.shared
     @Query(sort: \WatchedCompany.sortOrder) private var watched: [WatchedCompany]
 
@@ -29,6 +31,8 @@ struct RootView: View {
                 .tabItem { Label("比較", systemImage: "chart.bar") }
                 .tag(2)
         }
+        .environment(\.hasSideControls, hasSideControls)
+        .onGeometryChange(for: Bool.self) { SideControls.isPresent($0.safeAreaInsets) } action: { hasSideControls = $0 }
         .preferredColorScheme(.dark)
         .tint(Theme.accent)
         .toolbarBackground(.hidden, for: .tabBar)
