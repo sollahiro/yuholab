@@ -43,7 +43,7 @@ struct RootView: View {
                     .navigationDestination(for: CompanyRef.self, destination: ticker)
             }
             .toolbarTitleDisplayMode(.inline)
-            .tabItem { Label("比較", systemImage: "chart.bar") }
+            .tabItem { Label("同業比較", systemImage: "chart.bar") }
             .tag(2)
         }
         .preferredColorScheme(.dark)
