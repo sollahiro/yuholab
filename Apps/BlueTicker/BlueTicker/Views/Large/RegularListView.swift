@@ -28,24 +28,20 @@ struct RegularListView: View {
     }
 
     private func split(_ pane: LargeScreenModel.Pane) -> some View {
-        HStack(spacing: 0) {
+        AdaptiveSplit(fallbackWidth: 300) {
             leftList(selectedCode: pane.company?.code)
-                .frame(width: 300)
-            Divider().overlay(Color.white.opacity(0.08))
-            Group {
-                if let company = pane.company {
-                    RegularTickerPane(
-                        company: company, layout: .twoColumn, mode: .detail,
-                        onSetMode: { mode in model.update(1) { $0.mode = mode } },
-                        onBack: { model.update(1) { $0.company = nil } })
-                        .id(company.code)
-                } else {
-                    ContentUnavailableView(
-                        "銘柄を選んでください", systemImage: "list.bullet",
-                        description: Text("左のリストから選ぶと、ここに分析が出ます。"))
-                }
+        } secondary: {
+            if let company = pane.company {
+                RegularTickerPane(
+                    company: company, layout: .twoColumn, mode: .detail,
+                    onSetMode: { mode in model.update(1) { $0.mode = mode } },
+                    onBack: { model.update(1) { $0.company = nil } })
+                    .id(company.code)
+            } else {
+                ContentUnavailableView(
+                    "銘柄を選んでください", systemImage: "list.bullet",
+                    description: Text("左のリストから選ぶと、ここに分析が出ます。"))
             }
-            .frame(maxWidth: .infinity)
         }
     }
 

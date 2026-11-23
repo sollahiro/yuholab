@@ -29,27 +29,20 @@ struct RegularHomeView: View {
     }
 
     private func split(_ pane: LargeScreenModel.Pane) -> some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 8) {
-                Color.clear.frame(height: 8)
-                CompanySearchPanel(query: $query, selectedCode: pane.company?.code) { company in
-                    model.open(company, tab: 0)
-                }
+        AdaptiveSplit(fallbackWidth: 300) {
+            CompanySearchPanel(query: $query, selectedCode: pane.company?.code) { company in
+                model.open(company, tab: 0)
             }
-            .frame(width: 300)
-            Divider().overlay(Color.white.opacity(0.08))
-            Group {
-                if let company = pane.company {
-                    RegularTickerPane(
-                        company: company, layout: .twoColumn, mode: .detail,
-                        onSetMode: { mode in model.update(0) { $0.mode = mode } },
-                        onBack: { model.update(0) { $0.company = nil } })
-                        .id(company.code)
-                } else {
-                    FeedListPane(feed: feed) { company in model.open(company, tab: 0) }
-                }
+        } secondary: {
+            if let company = pane.company {
+                RegularTickerPane(
+                    company: company, layout: .twoColumn, mode: .detail,
+                    onSetMode: { mode in model.update(0) { $0.mode = mode } },
+                    onBack: { model.update(0) { $0.company = nil } })
+                    .id(company.code)
+            } else {
+                FeedListPane(feed: feed) { company in model.open(company, tab: 0) }
             }
-            .frame(maxWidth: .infinity)
         }
     }
 }

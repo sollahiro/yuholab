@@ -106,3 +106,31 @@ enum SideControls {
         abs(insets.leading - insets.trailing) >= asymmetryThreshold
     }
 }
+
+
+/// 一覧（プライマリ）と詳細（セカンダリ）の 2 ペイン。iOS 27.1 以降は標準の `ArrangementView`（`.split`）で、
+/// 向きに応じた左右／上下の分割と、折り目・余白の回避をシステムに任せる。それ以前は自前の左右分割（固定幅）。
+struct AdaptiveSplit<Primary: View, Secondary: View>: View {
+    /// プライマリが占める割合（`ArrangementView` の分割比）。フォールバックでは固定幅 `fallbackWidth` を使う。
+    var ratio: CGFloat = 0.36
+    var fallbackWidth: CGFloat = 300
+    @ViewBuilder var primary: Primary
+    @ViewBuilder var secondary: Secondary
+
+    var body: some View {
+        if #available(iOS 27.1, *) {
+            // 分割比は、プライマリ側のビューに付けて伝える（ArrangementView 自体ではなく）。
+            ArrangementView(
+                primary: { primary.splitArrangementLayoutRatio(ratio) },
+                secondary: { secondary }
+            )
+            .arrangementViewStyle(.split)
+        } else {
+            HStack(spacing: 0) {
+                primary.frame(width: fallbackWidth)
+                Divider().overlay(Color.white.opacity(0.08))
+                secondary.frame(maxWidth: .infinity)
+            }
+        }
+    }
+}

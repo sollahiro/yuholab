@@ -25,12 +25,10 @@ struct RegularCompareView: View {
     var body: some View {
         Group {
             if let group, let metric {
-                HStack(spacing: 0) {
+                AdaptiveSplit(ratio: 0.38, fallbackWidth: 340) {
                     left(group: group, metric: metric)
-                        .frame(width: 340)
-                    Divider().overlay(Color.white.opacity(0.08))
+                } secondary: {
                     right(group: group, metric: metric)
-                        .frame(maxWidth: .infinity)
                 }
             } else {
                 ContentUnavailableView("比較できる業種がありません", systemImage: "chart.bar")

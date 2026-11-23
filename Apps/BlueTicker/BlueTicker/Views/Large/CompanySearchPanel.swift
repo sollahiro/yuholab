@@ -75,6 +75,7 @@ struct CompanySearchPanel: View {
         .padding(.vertical, 10)
         .background(Theme.control, in: Capsule())
         .padding(.horizontal, 12)
+        .padding(.top, 8)
         .padding(.bottom, 8)
     }
 
