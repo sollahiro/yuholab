@@ -85,4 +85,21 @@ import Testing
         #expect(isDeterministicBreakdownNotApplicableReason(breakdownNotApplicableDomesticDominant90pct))
         #expect(isDeterministicBreakdownNotApplicableReason(breakdownNotApplicableNoOverseasSales))
     }
+
+    /// 省略文を 1 セルだけの表で包む有報（7963 興研）。表のセルでも地の文として拾う。
+    @Test func omissionSentenceInsideSingleCellTableIsKept() {
+        let html = """
+            <p>(1）売上高</p><div><table><tbody><tr><td><p>本邦の外部顧客への売上高が連結損益計算書の売上高の90％を超えるため、記載を省略しております。</p></td></tr></tbody></table></div>
+            """
+        let sentences = BreakdownExtractor.omissionSentenceSources(in: html)
+            .flatMap(BreakdownExtractor.splitSentences)
+        #expect(classify(sentences) == breakdownNotApplicableDomesticDominant90pct)
+    }
+
+    /// 複数セルの表（数値の表）は地の文に混ぜない。
+    @Test func multiCellTableIsNotMixedIntoProse() {
+        let html = "<p>注記</p><table><tr><td>日本</td><td>本邦の売上高は90％を超える</td></tr></table>"
+        let joined = BreakdownExtractor.omissionSentenceSources(in: html).joined()
+        #expect(!joined.contains("90％"))
+    }
 }
