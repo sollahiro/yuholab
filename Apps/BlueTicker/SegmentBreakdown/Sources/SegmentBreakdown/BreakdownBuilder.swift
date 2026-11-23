@@ -162,24 +162,31 @@ enum BreakdownBuilder {
 
     /// 地域別売上の年次推移（API の `waterfall/geography`、新しい年が先頭）を、古い順の列にする。
     /// 同じ `comparable_group` の年どうしは、塊の共通のキー（`comparable_regions`）でつなぐ。
-    /// 塊が変わる年は前年とつながず、その年に `reorged` を立てる（年ラベルの下に「再編」）。
+    /// 塊が変わる年はその年に `reorged` を立てる（年ラベルの下に「再編」）。塊が変わっても、
+    /// 同じキーで構成する地域（`members`）まで同じ行は前年とつなぐ（日本などは再編の影響を受けない）。
     static func geographyColumns(
         _ response: GeographyWaterfallResponse,
         columnLabel: (GeographyWaterfallResponse.Year) -> String
     ) -> [BreakdownColumnInput] {
         var columns: [BreakdownColumnInput] = []
         var previousGroup: Int?
-        var previousKeys = Set<String>()
+        var previousMembers: [String: [String]?] = [:]
         for year in response.years.reversed() {
             let blocks = year.comparableRegions ?? []
             guard !blocks.isEmpty else { continue }
             let group = year.comparableGroup
             let sameGroup = previousGroup != nil && previousGroup == group
-            var keys = Set<String>()
+            var members: [String: [String]?] = [:]
             let items = blocks.compactMap { block -> BreakdownItemInput? in
                 guard let value = block.value else { return nil }
-                keys.insert(block.region)
-                let link: BreakdownLink = sameGroup && previousKeys.contains(block.region) ? .connect(block.region) : .none
+                let blockMembers = block.members?.sorted()
+                members[block.region] = blockMembers
+                let link: BreakdownLink
+                if let before = previousMembers[block.region], sameGroup || (blockMembers != nil && before == blockMembers) {
+                    link = .connect(block.region)
+                } else {
+                    link = .none
+                }
                 return BreakdownItemInput(
                     key: block.region, label: regionLabel(block, in: year), value: value, link: link)
             }
@@ -188,7 +195,7 @@ enum BreakdownBuilder {
                 BreakdownColumnInput(
                     label: columnLabel(year), items: items, reorged: previousGroup != nil && !sameGroup))
             previousGroup = group
-            previousKeys = keys
+            previousMembers = members
         }
         return columns
     }
