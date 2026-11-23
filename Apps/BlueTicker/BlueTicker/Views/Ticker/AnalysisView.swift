@@ -40,6 +40,7 @@ struct AnalysisView: View {
                 CapitalEfficiencySection(years: years)
                 CashAllocationSection(years: years, currency: currency)
                 ProductivitySection(years: years, currency: currency)
+                RelationsCard(code: code)
             }
             .padding(Theme.cardContentInset)
         }
