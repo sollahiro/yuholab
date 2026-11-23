@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>iPhone Duo 内側・外側 モック（有報LAB）</title>
+<style>
+:root{
+  --shell:#080809; --card:#212326; --control:#141417; --elevated:#333538;
+  --text:#fafafc; --muted:#b3b8bf; --accent:#59b3f2; --idle:#595c61;
+  --pos:#47c76b; --neg:#eb4752; --r:22px;
+  --bar:#59b3f2; --bar2:#8f94ff; --line:#fad11f; --roe:#47c76b;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:#1b1c1f;color:var(--text);font-family:-apple-system,"Hiragino Sans","Noto Sans JP",system-ui,sans-serif;display:flex;gap:36px;justify-content:center;align-items:flex-start;padding:28px 16px;flex-wrap:wrap}
+.side{max-width:330px;font-size:13px;line-height:1.75;color:var(--muted)}
+.side h1{font-size:17px;color:var(--text);margin-bottom:8px}
+.side h2{font-size:13px;color:var(--text);margin:16px 0 4px}
+.side ul{padding-left:18px}
+.side b{color:var(--text)}
+.badge{display:inline-block;background:#3a2f12;color:#f5c542;border-radius:6px;padding:1px 7px;font-size:11px;margin-left:4px}
+.new{display:inline-block;background:#12303a;color:#59c8f5;border-radius:6px;padding:0 6px;font-size:10px;margin-left:4px}
+.devwrap{display:flex;flex-direction:column;align-items:center}
+.cap{width:100%;text-align:center;font-size:12px;color:var(--muted);margin-top:10px}
+.duo{width:971px;height:689px;background:var(--shell);border-radius:44px;border:10px solid #000;box-shadow:0 0 0 2px #3a3b3f,0 30px 60px #0008;position:relative;overflow:hidden;flex:none}
+.outer{width:486px;height:698px;background:var(--shell);border-radius:44px;border:10px solid #000;box-shadow:0 0 0 2px #3a3b3f,0 30px 60px #0008;position:relative;overflow:hidden;flex:none}
+.app{position:absolute;inset:0;display:flex}
+.rail{width:84px;flex:none;padding:46px 10px 18px;display:flex;flex-direction:column;gap:6px;align-items:center;border-right:1px solid #ffffff0d}
+.orail{width:64px;flex:none;order:2;padding:46px 6px 18px;display:flex;flex-direction:column;gap:6px;align-items:center;border-left:1px solid #ffffff0d}
+.orail .tab{width:52px;font-size:9px}
+.logo{width:34px;height:34px;border-radius:9px;background:var(--accent);color:#06121c;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+.tab{width:64px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--muted);cursor:pointer;padding:8px 0;border-radius:16px}
+.tab svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tab.on{color:var(--accent);background:#ffffff12}
+.main{flex:1;min-width:0;position:relative}
+.omain{flex:1;min-width:0;position:relative;order:1}
+.screen,.ostack{position:absolute;inset:0;display:none}
+.screen.on{display:flex}
+.ostack{flex-direction:column}
+.ostack.on{display:flex}
+.pane{position:relative;display:flex;flex-direction:column;min-width:0;height:100%}
+.ph{padding:42px 16px 8px;display:flex;align-items:center;justify-content:space-between;font-size:15px;font-weight:600;color:var(--muted);gap:8px}
+.ph .menu{font-size:13px;color:var(--text);font-weight:600}
+.pb{flex:1;overflow-y:auto;padding:0 12px 14px;scrollbar-width:none}
+.pb::-webkit-scrollbar{display:none}
+.vsep{width:1px;background:#ffffff0d;flex:none}
+.co{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:16px;cursor:pointer}
+.co.sel{background:#59b3f226;box-shadow:inset 0 0 0 1.5px var(--accent)}
+.icon{width:36px;height:36px;border-radius:8px;background:#fff;color:#333;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex:none}
+.co .mid{flex:1;min-width:0}
+.co .nm{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.co .cd{font-size:12px;color:var(--muted)}
+.nav{display:flex;align-items:center;gap:10px;padding:38px 14px 8px}
+.circ{width:38px;height:38px;border-radius:50%;background:#ffffff1c;display:flex;align-items:center;justify-content:center;font-size:17px;flex:none;cursor:pointer}
+.pill{display:flex;align-items:center;gap:9px;background:#ffffff1c;border-radius:99px;padding:5px 16px 5px 5px;min-width:0}
+.pill .icon{width:32px;height:32px;border-radius:7px;font-size:13px}
+.pill .t{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill .s{font-size:11px;color:var(--muted);white-space:nowrap}
+.sp{flex:1}
+.sel2{background:#ffffff1c;border-radius:99px;padding:8px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.focus-b{font-size:9px;font-weight:700;color:#06121c;background:var(--accent);border-radius:99px;padding:1px 7px;margin-left:6px}
+.pane.focus{box-shadow:inset 0 0 0 1.5px #59b3f244}
+.card{background:var(--card);border-radius:var(--r);padding:16px;break-inside:avoid;margin-bottom:10px}
+.card h3{font-size:16px;font-weight:700;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.card h3 .i{font-size:12px;color:var(--muted);font-weight:400;border:1.5px solid var(--muted);width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.sub{font-size:12px;font-weight:600;color:var(--text);margin:10px 0 4px}
+.note{font-size:11px;line-height:1.65;color:var(--muted);margin-top:8px}
+.note b{color:var(--text)}
+.cols{columns:2;column-gap:10px}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--muted);margin-top:6px}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px}
+svg text{fill:var(--muted);font-size:9px;font-family:inherit}
+table{border-collapse:collapse;width:100%}
+th,td{padding:6px 6px;font-size:11px;text-align:right;font-variant-numeric:tabular-nums;border-top:1px solid #ffffff10}
+th{color:var(--muted);font-weight:600;font-size:10px;border-top:0}
+th:first-child,td:first-child{text-align:left;color:var(--muted)}
+td.best{color:var(--pos);font-weight:700}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+.step{display:flex;justify-content:space-between;align-items:center;padding:9px 6px;font-size:13px;border-top:1px solid #ffffff10;cursor:pointer}
+.step:first-child{border-top:0}
+.step.sel{color:var(--accent);font-weight:700}
+.formula{font-family:ui-monospace,Menlo,monospace;font-size:11px;background:#2a2c30;color:#d6e6f5;border-radius:8px;padding:6px 8px;margin:6px 0;line-height:1.5}
+.grp{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--card);margin-bottom:8px;cursor:pointer}
+.grp .sym{width:34px;height:34px;border-radius:8px;background:var(--elevated);display:flex;align-items:center;justify-content:center;font-size:16px}
+.grp b{font-size:15px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding:2px 0 8px}
+.chip{font-size:11px;font-weight:600;padding:5px 10px;border-radius:99px;background:var(--idle);color:#fff;cursor:pointer;border:1.5px solid transparent}
+.chip.sel{background:#47c76b22;color:var(--pos);border-color:var(--pos)}
+.rk{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:14px;cursor:pointer}
+.rk.pin{background:#59b3f21a}
+.rk .rank{width:14px;text-align:center;font-size:11px;color:var(--muted)}
+.rk .mid{flex:1;min-width:0}
+.rk .nm{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rk .bar{height:5px;border-radius:3px;background:#ffffff14;margin-top:5px;overflow:hidden}
+.rk .bar i{display:block;height:100%;border-radius:3px;background:var(--pos)}
+.rk .val{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;min-width:62px;text-align:right}
+.rk .pinb{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--idle);font-size:12px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.rk.pin .pinb{background:var(--accent);border-color:var(--accent);color:#06121c;font-weight:800}
+.pop{position:absolute;left:12px;right:12px;top:88px;background:#2a2c30;border-radius:20px;padding:8px;z-index:20;box-shadow:0 18px 40px #000a}
+.pop .inp{display:flex;align-items:center;gap:8px;background:var(--control);border-radius:99px;padding:8px 14px;font-size:13px}
+.pop .inp input{flex:1;background:none;border:0;outline:0;color:var(--text);font-size:13px;font-family:inherit}
+.pop .hd{font-size:10px;color:var(--muted);padding:8px 8px 2px}
+.pop .it{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:12px;cursor:pointer;font-size:13px}
+.pop .it:hover{background:#ffffff14}
+.pop .it .icon{width:28px;height:28px;font-size:12px;border-radius:7px}
+.pop .it .cd{margin-left:auto;font-size:11px;color:var(--muted)}
+.pop .it.cur{opacity:.4;cursor:default}
+
+.hd2{display:flex;align-items:center;gap:12px;padding:38px 14px 6px}
+.hd2 .icon{width:46px;height:46px;font-size:19px;border-radius:10px}
+.hd2 .tt{min-width:0}
+.hd2 .t{font-size:19px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hd2 .s{font-size:12px;color:var(--muted);white-space:nowrap}
+.ov{font-size:12px;line-height:1.7;color:var(--muted);padding:0 16px 10px;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden;text-align:justify}
+.seg{display:flex;background:#ffffff14;border-radius:99px;padding:3px;flex:none}
+.seg span{display:flex;align-items:center;font-size:12px;font-weight:600;padding:7px 12px;border-radius:99px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.seg span.on{background:var(--elevated);color:var(--text)}
+.hd2.c{gap:7px;padding-left:10px;padding-right:10px}.hd2.c .icon{width:34px;height:34px;font-size:14px;border-radius:8px}.hd2.c .t{font-size:15px}.hd2.c .circ{width:32px;height:32px;font-size:14px}.hd2.c .sel2{padding:7px 10px;font-size:11px}.hd2.c .seg span{padding:6px 9px}.hd2 .tt{flex:0 1 auto}.hd2 .sp{flex:1;min-width:0}
+
+.sbar{display:flex;align-items:center;gap:8px;background:var(--control);border-radius:99px;padding:10px 14px;font-size:13px;margin:0 12px 8px;box-shadow:inset 0 0 0 1px #ffffff14}
+.sbar input{flex:1;background:none;border:0;outline:0;color:var(--text);font-size:14px;font-family:inherit}
+.hrow{display:flex;align-items:center;gap:12px;padding:0 4px;height:56px;border-top:1px solid #333538;cursor:pointer}
+.hrow:first-child{border-top:0}
+.hrow .nm{font-size:14px;font-weight:600}
+.hrow .cd{font-size:11px;color:var(--muted)}
+.hrow .d{text-align:right;font-size:11px;color:var(--text);font-variant-numeric:tabular-nums}
+.hrow .d small{display:block;color:var(--muted);font-size:9px}
+.hrow .ch{color:var(--muted);font-size:12px}
+.fh{display:flex;align-items:center;justify-content:space-between;padding:0 4px 8px;font-size:13px;font-weight:600;color:var(--muted)}
+.live{font-size:10px;font-weight:500;color:var(--muted)}
+.live i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--pos);margin-right:5px}
+.pane[data-side]{flex:1 1 0}
+
+.otop{display:flex;align-items:center;gap:8px;padding:44px 14px 8px;flex:none}
+.olog{font-size:20px;font-weight:800;letter-spacing:.02em}
+.olt{font-size:17px;font-weight:600;width:100%;text-align:center}
+.otabs{position:absolute;top:0;bottom:0;right:0;width:68px;border-left:1px solid #ffffff0d;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;gap:6px;padding:50px 4px 18px;z-index:10}
+.outer .ostack{right:68px}
+.otab{width:56px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9px;color:var(--muted);cursor:pointer;padding:8px 0;border-radius:16px}
+.otab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.otab.on{color:var(--accent);background:#ffffff14}
+.ostack .pb{padding-bottom:14px}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tile{background:var(--card);border-radius:18px;padding:12px 6px;text-align:center;cursor:pointer}
+.tile .icon{margin:0 auto 6px;width:44px;height:44px;font-size:17px;border-radius:10px}
+.tile .n{font-size:11px;font-weight:600;line-height:1.35;height:30px;overflow:hidden}
+.tile .c{font-size:10px;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
+.dots{display:flex;justify-content:center;gap:6px;margin-top:10px}
+.dots i{height:6px;width:6px;border-radius:3px;background:var(--idle)}
+.dots i.on{width:16px;background:var(--text)}
+.ovx{font-size:12px;line-height:1.7;color:var(--muted);text-align:justify;padding:0 2px 10px}
+
+.fb{margin-top:8px;background:#ffffff1c;color:var(--text);border:0;border-radius:99px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.fb:hover{background:#ffffff2e}
+@keyframes fl{0%{box-shadow:0 0 0 2px #3a3b3f,0 0 0 6px #59b3f2cc,0 30px 60px #0008}100%{box-shadow:0 0 0 2px #3a3b3f,0 0 0 6px #59b3f200,0 30px 60px #0008}}
+.flash{animation:fl 1.1s ease-out}
+td.dsc{text-align:left;padding-left:14px;color:var(--muted);font-size:10.5px;line-height:1.5;min-width:150px}
+tr.cur td{background:#59b3f20f}
+.cmpcap{font-size:11px;font-weight:400;color:var(--muted);text-align:right;line-height:1.5;max-width:60%}
+.spk{width:40px;flex:none;opacity:.9}
+.backc{width:34px;height:34px;border-radius:50%;background:#ffffff1c;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;flex:none}
+</style>
+</head>
+<body>
+
+<div class="side">
+  <h1>iPhone Duo 内側・外側 モック</h1>
+  <p>内側 951×669pt（横向き・開いた状態）／外側 466×678pt（閉じた状態）。<span class="badge">数値はダミー</span></p>
+  <p style="margin-top:6px">表示内容は<b>現在のiOSアプリ</b>（銘柄面の各カード、リスト、比較）に合わせています。<span class="new">新規</span> は大画面で足す提案です。</p>
+  <h2>ホーム（検索 + feed/update）</h2>
+  <ul><li>左に常設の検索バー。未入力は「最近あなたが調べた企業」、入力中は「検索候補」。右に <span class="new">新規</span> feed/update「最近有報が更新された企業」を常時表示（現行は6社ずつのページ送り → 大画面では縦に並べてスクロール）。行をタップすると右ペインが銘柄画面に切り替わり、‹ でfeedへ戻る。</li></ul>
+  <h2>銘柄画面（内側）</h2>
+  <ul><li>銘柄ピルはやめ、アイコン・社名・コード/業種の見出しと <b>Overview（最大5行）を常時表示</b>。右上に星（共有ボタンなし）と <span class="new">新規</span> 表示切替（アイコン: 全画面 / 2つ）。</li>
+  <li><b>リスト＋詳細</b>（初期）: 左に「あなたの追加した企業」、右に分析カードを2列で同時表示。</li>
+  <li><b>全画面</b>: 収益構造のウォーターフォールを大きく表示し、右に要因の式と意味を常時表示。‹ でリストへ戻る。</li>
+  <li><b>2つ</b>: 左右に別銘柄の銘柄画面。ペインをタップでフォーカス移動。<b>閉じたとき（外側）はフォーカス側が残る</b>。検索アイコンで名前・コードから入れ替え。</li></ul>
+  <h2>比較</h2>
+  <ul><li>現在の「比較したい業種を選択 → 銀行ランキング」の7指標をそのまま使用。<span class="new">新規</span> ピン留めして右で並列比較。<span class="new">新規</span> 各行に推移のミニグラフ、右に選択した指標の<b>過去の推移（5年）</b>を重ね描き。</li></ul>
+  <h2>開閉（ボタンで試せます）</h2>
+  <ul><li>開く: 外側の画面に対応する内側の画面へ。ホーム→ホーム、リスト→リスト、比較→比較。<b>銘柄画面は、ホームから開いていたらホームの右ペイン、リストから開いていたらリストの右ペインで同じ銘柄</b>を開く。</li>
+  <li>閉じる: 内側の画面に対応する外側へ。2つ表示のときはフォーカス側の銘柄の銘柄画面。</li></ul>
+  <h2>外側</h2>
+  <ul><li><b>現行iOSと同じ中身＋Duo版のタブ</b>: タブは右の縦レール（ホーム/リスト/比較）、ホームはfeed（6社ずつページ送り。ロゴは廃止）、リストは3列タイル、銘柄画面は ‹・社名ピル（タップでOverview）・チャート・ブックマーク。</li></ul>
+  <p style="margin-top:14px;font-size:11px">クリックできます: リストの行、右上の表示切替アイコン、ウォーターフォールの棒、2つ表示の検索、比較の指標とピン。</p>
+</div>
+
+<div class="devwrap"><div class="duo"><div class="app">
+  <div class="rail">
+    <div class="logo">有</div>
+    <div class="tab on" data-s="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>ホーム</div>
+    <div class="tab" data-s="list"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>リスト</div>
+    <div class="tab" data-s="compare"><svg viewBox="0 0 24 24"><path d="M5 21V9M12 21V3M19 21v-6"/></svg>比較</div>
+  </div>
+  <div class="main">
+   <div class="screen on" id="s-home"></div>
+
+   <div class="screen" id="s-list"></div>
+
+   <div class="screen" id="s-compare">
+     <div class="pane" style="width:350px;flex:none">
+       <div class="ph">比較したい業種を選択</div>
+       <div class="pb">
+         <div class="grp"><div class="sym">🏛</div><b>銀行</b><span class="sp"></span><span style="color:var(--idle)">›</span></div>
+         <div class="chips" id="mchips"></div>
+         <div id="rank"></div>
+       </div>
+     </div>
+     <div class="vsep"></div>
+     <div class="pane" style="flex:1">
+       <div class="ph">銀行 · 並列比較<span class="menu" id="pinSub"></span></div>
+       <div class="pb">
+         <div class="card"><h3 style="align-items:baseline;gap:14px"><span id="cmpTitle">預貸率</span><span class="cmpcap" id="cmpCap"></span></h3><div id="cmpBars"></div><div class="sub" style="margin-top:14px">推移（21/3 → 25/3）</div><div id="cmpLine"></div><div class="legend" id="cmpLeg"></div></div>
+         <div class="card"><h3>指標の比較</h3><div id="cmpTable"></div></div>
+       </div>
+     </div>
+   </div>
+
+  </div>
+</div></div>
+<div class="cap">内側（開いた状態・約951×669pt）: 2ペイン。タブは左レール。<br><button class="fb" id="foldBtn">閉じる ⇢ 外側の対応画面へ</button></div></div>
+
+<div class="devwrap"><div class="outer">
+  <div class="ostack on" id="o-home">
+    <div class="otop"><span class="sp"></span><div class="circ" style="width:36px;height:36px;font-size:15px">⌕</div><div class="circ" style="width:36px;height:36px;font-size:15px">◷</div></div>
+    <div class="pb" id="oHomeBody"></div>
+  </div>
+  <div class="ostack" id="o-list">
+    <div class="otop"><div class="olt">リスト</div></div>
+    <div class="pb" id="oListBody"></div>
+  </div>
+  <div class="ostack" id="o-compare">
+    <div class="otop"><div class="olt" id="oCmpT">比較</div></div>
+    <div class="pb" id="oCmpBody"></div>
+  </div>
+  <div class="ostack" id="o-ticker">
+    <div class="otop" style="gap:8px"><div class="backc" id="oback">‹</div><div class="pill" id="oPill"><div class="icon" id="oIcon">ト</div><div style="min-width:0"><div class="t" id="oName"></div><div class="s" id="oSub"></div></div></div><span class="sp"></span><div class="circ" style="width:36px;height:36px;font-size:14px">⌗</div><div class="circ" style="width:36px;height:36px;font-size:14px">🔖</div></div>
+    <div class="pb" id="oBody"></div>
+  </div>
+  <div class="otabs">
+    <div class="otab on" data-o="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>ホーム</div>
+    <div class="otab" data-o="list"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>リスト</div>
+    <div class="otab" data-o="compare"><svg viewBox="0 0 24 24"><path d="M5 21V9M12 21V3M19 21v-6"/></svg>比較</div>
+  </div>
+</div>
+<div class="cap">外側（閉じた状態・約466×678pt）: <b>現行iOSと同じ構成</b>。タブはDuo版の右レール、ホームはfeedの6社ページ送り、リストは3列タイル、銘柄画面は戻る＋社名ピル＋チャート/ブックマーク。<br><button class="fb" id="unfoldBtn">開く ⇠ 内側の対応画面へ</button></div></div>
+
+<script>
+const yrs=['21/3','22/3','23/3','24/3','25/3'];
+const base=[
+ {id:'7203',n:'トヨタ自動車',ic:'ト',rev:[27.2,31.4,37.2,45.1,37.6],op:[2.2,2.9,2.7,5.3,4.8],roe:[11,12,9.5,15,14],roic:[7.2,8.1,6.4,10.5,9.4],seg:[['自動車',88],['金融',8],['その他',4]],reg:[['日本',24],['北米',36],['欧州',10],['アジア',22],['その他',8]]},
+ {id:'7267',n:'本田技研工業',ic:'ホ',rev:[14.6,15.8,17.2,20.4,21.8],op:[0.7,1.0,0.9,1.4,1.2],roe:[8,9.5,7.8,10,9.2],roic:[5.1,6.0,4.8,6.5,6.1],seg:[['二輪',34],['四輪',55],['金融',11]],reg:[['日本',12],['北米',44],['欧州',4],['アジア',34],['その他',6]]},
+ {id:'7201',n:'日産自動車',ic:'日',rev:[8.4,8.5,10.6,12.6,12.6],op:[0.3,0.5,0.3,0.6,0.1],roe:[2,4,1,5,-1],roic:[1.9,2.8,1.1,3,0.4],seg:[['自動車',92],['金融',8]],reg:[['日本',18],['北米',42],['欧州',12],['アジア',20],['その他',8]]},
+ {id:'7269',n:'スズキ',ic:'ス',rev:[3.5,3.9,4.6,5.3,5.8],op:[0.3,0.37,0.4,0.6,0.55],roe:[11,12,13,16,15],roic:[8,8.6,9.1,11,10.4],seg:[['四輪',85],['二輪',12],['他',3]],reg:[['日本',40],['インド',32],['アジア',14],['その他',14]]},
+ {id:'7270',n:'SUBARU',ic:'S',rev:[2.8,3.0,3.8,4.7,4.9],op:[0.1,0.16,0.22,0.52,0.51],roe:[7,6,8,13,12],roic:[4,3.9,5.2,8.8,8.1],seg:[['自動車',97],['他',3]],reg:[['日本',12],['北米',68],['欧州',6],['その他',14]]},
+ {id:'7261',n:'マツダ',ic:'マ',rev:[3.1,3.1,3.8,4.8,5.0],op:[0.05,0.11,0.14,0.22,0.17],roe:[4,5,6.5,10,8],roic:[2.6,3.4,4.1,6.2,5.0],seg:[['日本',24],['北米',34],['欧州',16],['他',26]],reg:[['日本',24],['北米',34],['欧州',16],['その他',26]]},
+ {id:'6758',n:'ソニーグループ',ic:'ソ',rev:[9.0,10.0,11.5,13.0,12.9],op:[1.2,1.2,1.2,1.2,1.4],roe:[16,15,13,12,14],roic:[8,7,7,6,7],seg:[['ゲーム',30],['音楽',12],['映画',9],['他',49]],reg:[['日本',28],['米国',22],['欧州',15],['アジア',35]]},
+ {id:'8035',n:'東京エレクトロン',ic:'東',rev:[2.0,2.2,2.4,1.9,2.4],op:[0.6,0.7,0.8,0.5,0.7],roe:[28,30,26,18,20],roic:[18,20,17,11,13],seg:[['成膜',20,'#59b3f2'],['エッチング',35],['他',45]],reg:[['日本',12],['中国',40],['北米',15],['アジア',33]]},
+ {id:'7974',n:'任天堂',ic:'任',rev:[1.76,1.69,1.60,1.67,1.13],op:[0.64,0.60,0.56,0.54,0.28],roe:[16,14,13,12,9],roic:[14,12,11,10,6],seg:[['ハード',45],['ソフト',45],['他',10]],reg:[['日本',24],['米州',36],['欧州',24],['他',16]]},
+ {id:'6594',n:'ニデック',ic:'二',rev:[1.9,2.2,2.3,2.3,2.6],op:[0.16,0.16,0.2,0.22,0.24],roe:[10,11,9,10,11],roic:[7,8,6,7,8],seg:[['精密小型',22],['車載',30],['機械',48]],reg:[['日本',20],['中国',25],['米州',20],['欧州',15],['他',20]]},
+ {id:'9983',n:'ファーストリテイリング',ic:'フ',rev:[2.1,2.3,2.8,3.1,3.4],op:[0.25,0.30,0.38,0.5,0.5],roe:[13,15,16,17,16],roic:[9,10,11,12,11],seg:[['国内',40],['海外',45],['他',15]],reg:[['日本',40],['中国',22],['アジア',23],['他',15]]},
+ {id:'6861',n:'キーエンス',ic:'キ',rev:[0.76,0.92,1.0,1.0,1.05],op:[0.38,0.47,0.52,0.5,0.52],roe:[14,16,16,15,14],roic:[14,16,16,15,14],seg:[['センサ',48],['測定',30],['他',22]],reg:[['日本',48],['海外',52]]},
+];
+base.forEach(c=>{
+  c.sec=({'6758':'電機・精密','6861':'電機・精密','8035':'電機・精密','6594':'電機・精密','7974':'情報通信・サービス他','9983':'小売'})[c.id]||'自動車・輸送機';
+  c.net=c.op.map(v=>+(v*.75).toFixed(2));
+  c.bp=c.op.map(v=>+(v*.95).toFixed(2));
+  const d=c.bp[4]-c.bp[3],sga=c.rev.map(v=>v*.13);
+  const sgaF=-(sga[4]-sga[3]),salesF=(c.rev[4]-c.rev[3])*.2,marginF=d-salesF-sgaF;
+  c.f=[['売上要因',+salesF.toFixed(2)],['利益率要因',+marginF.toFixed(2)],['販管費要因',+sgaF.toFixed(2)]];
+  c.fcf=c.op.map((v,i)=>+(v*(.45+.05*(i%3))-(i===2?.5*v:0)).toFixed(2));
+  let nc=c.op[0]*2;c.nc=c.fcf.map(v=>+(nc+=v*.6).toFixed(2));
+  c.emp=c.rev.map((v,i)=>Math.round(v*1e12/(80e6+i*4e6)/1000)*1000);
+  c.spe=c.rev.map((v,i)=>+(v*1e12/c.emp[i]/1e6).toFixed(0));
+  c.nm=c.net.map((v,i)=>+(v/c.rev[i]*100).toFixed(2));
+  c.to=c.rev.map(()=>0.82);
+  c.lev=c.roe.map((r,i)=>+(r/(c.nm[i]*c.to[i])).toFixed(2));
+});
+const OV={
+ '7203':'世界最大級の自動車メーカー。トヨタ・レクサスブランドを中心に、ハイブリッド車で強みを持つ。北米・アジアを中心に海外売上が大きく、金融事業も展開する。',
+ '7267':'二輪車で世界首位級、四輪も展開する総合モビリティメーカー。アジアの二輪が収益の柱で、電動化と software-defined vehicle に投資を進める。',
+ '7201':'日産・インフィニティブランドの自動車メーカー。北米・中国・欧州に展開し、ルノー・三菱自動車とのアライアンスを組む。',
+ '7269':'軽自動車・小型車に強い自動車メーカー。インド市場で高いシェアを持ち、二輪・船外機も手がける。',
+ '7270':'水平対向エンジンと AWD に特徴を持つ自動車メーカー。北米への依存度が高く、航空宇宙事業も持つ。',
+ '7261':'ロータリーエンジンとスカイアクティブ技術で知られる自動車メーカー。北米・欧州の比率が高い。',
+ '6758':'ゲーム・音楽・映画・エレクトロニクス・半導体・金融を手がけるコングロマリット。',
+ '8035':'半導体製造装置の世界大手。成膜・エッチング・洗浄装置を手がける。','7974':'家庭用ゲーム機とソフトを企画・開発・販売する。','6594':'精密小型モータ、車載、産業用の駆動モーターを手がける総合モーターメーカー。','9983':'ユニクロ、ジーユーなどを展開する衣料小売。海外売上が国内を上回る。','6861':'ファクトリーオートメーション向けのセンサ・測定器を直販する。高い営業利益率で知られる。'};
+base.forEach(c=>c.ov=OV[c.id]);
+const cos=base.slice(0,6),more=base.slice(6),all=base;
+let cur=cos[0];
+const sg=v=>(v>=0?'+':'')+v;
+
+function perfChart(c,W=520){const H=Math.round(W*.27)+20;
+  const p=34,gw=(W-p*2)/5,bw=Math.min(18,gw/2-4),ms=Math.max(...c.rev)*1.1,mn=Math.max(...c.net)*1.1;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%">`;
+  c.rev.forEach((r,i)=>{const x=p+i*gw+gw/2,rh=r/ms*(H-32),nh=c.net[i]/mn*(H-32);
+    s+=`<rect x="${x-bw-1}" y="${H-18-rh}" width="${bw}" height="${rh}" rx="3" fill="var(--bar)"/><rect x="${x+1}" y="${H-18-nh}" width="${bw}" height="${nh}" rx="3" fill="var(--bar2)"/><text x="${x}" y="${H-5}" text-anchor="middle">${yrs[i]}</text>`});
+  s+=`<text x="2" y="10">兆円</text><text x="${W-2}" y="10" text-anchor="end">兆円</text>`;
+  return s+`</svg><div class="legend"><span><i style="background:var(--bar)"></i>売上高（左軸）</span><span><i style="background:var(--bar2)"></i>純利益（右軸）</span></div>`;
+}
+function bpChart(c,W=520,H=130){
+  const p=24,gw=(W-p*2)/5,bw=Math.min(22,gw/2-4),mx=Math.max(...c.bp)*1.15;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%">`;
+  c.bp.forEach((v,i)=>{const x=p+i*gw+gw/2,h=v/mx*(H-34);
+    s+=`<rect x="${x-bw/2}" y="${H-18-h}" width="${bw}" height="${h}" rx="3" fill="var(--bar)"/><text x="${x}" y="${H-5}" text-anchor="middle">${yrs[i]}</text><text x="${x}" y="${H-21-h}" text-anchor="middle" style="fill:#fafafc">${v}</text>`;
+    if(i>0){const d=v-c.bp[i-1],dh=Math.abs(d)/mx*(H-34);s+=`<rect x="${x+bw/2+2}" y="${H-18-dh}" width="6" height="${Math.max(dh,1.5)}" rx="2" fill="${d>=0?'var(--pos)':'var(--neg)'}"/>`}});
+  return s+`</svg><div class="legend"><span><i style="background:var(--bar)"></i>事業利益</span><span><i style="background:var(--pos)"></i>増益</span><span><i style="background:var(--neg)"></i>減益</span></div>`;
+}
+function wfData(c){return [['前年度\n事業利益',c.bp[3],'t'],...c.f.map(([n,v])=>[n,v,'d']),['今年度\n事業利益',c.bp[4],'t']]}
+function wfChart(c,W,H,sel,big){
+  const d=wfData(c);let run=0;const pts=[];
+  d.forEach(([n,v,t])=>{if(t==='t'){pts.push([n,0,v,t,v]);run=v}else{const s0=run;run+=v;pts.push([n,Math.min(s0,run),Math.max(s0,run),t,v])}});
+  const mn=Math.min(0,...pts.map(p=>p[1])),mx=Math.max(...pts.map(p=>p[2]))*1.1,p=big?30:14,gw=(W-p*2)/pts.length,bw=gw*.56;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%">`;
+  pts.forEach((q,i)=>{const x=p+i*gw+(gw-bw)/2,y1=H-30-((q[2]-mn)/(mx-mn))*(H-52),y0=H-30-((q[1]-mn)/(mx-mn))*(H-52);
+    const col=q[3]==='t'?'var(--bar)':q[4]>=0?'var(--pos)':'var(--neg)';
+    s+=`<rect class="wb" data-i="${i}" x="${x}" y="${y1}" width="${bw}" height="${Math.max(y0-y1,2)}" rx="4" fill="${col}" opacity="${sel===undefined||sel===i||q[3]==='t'?1:.4}" style="cursor:pointer"/>`;
+    q[0].split('\n').forEach((ln,k)=>s+=`<text x="${x+bw/2}" y="${H-17+k*10}" text-anchor="middle" ${sel===i?'style="fill:#59b3f2;font-weight:700"':''}>${ln}</text>`);
+    s+=`<text x="${x+bw/2}" y="${y1-4}" text-anchor="middle" style="fill:#fafafc;font-size:${big?11:9}px">${q[3]==='t'?q[4]:sg(q[4])}</text>`});
+  return s+'</svg>';
+}
+function stackBar(items){
+  const cols=['#59b3f2','#47c76b','#fad11f','#c58bff','#ff8f5a'],tot=items.reduce((a,b)=>a+b[1],0);let x=0;
+  let s='<svg viewBox="0 0 250 22" width="100%">';items.forEach(([n,v],i)=>{const w=v/tot*250;s+=`<rect x="${x}" y="2" width="${Math.max(w-2,1)}" height="18" rx="4" fill="${cols[i%5]}"/>`;x+=w});
+  return s+'</svg><div class="legend">'+items.map(([n,v],i)=>`<span><i style="background:${cols[i%5]}"></i>${n} ${v}%</span>`).join('')+'</div>';
+}
+function lineChart(series,W,H,zero=true){
+  const all=series.flatMap(s=>s.d),lo=Math.min(...all),hi=Math.max(...all),mn=zero?Math.min(lo,0):lo-(hi-lo)*.15,mx=zero?hi*1.1:hi+(hi-lo)*.15,p=26;
+  const X=i=>p+i*((W-p*2)/4),Y=v=>H-18-((v-mn)/(mx-mn))*(H-30);
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%">`;
+  for(let k=0;k<=3;k++){const v=mn+(mx-mn)*k/3;s+=`<line x1="${p}" x2="${W-p}" y1="${Y(v)}" y2="${Y(v)}" stroke="#ffffff10"/><text x="${p-5}" y="${Y(v)+3}" text-anchor="end">${v.toFixed(mx<10?1:0)}</text>`}
+  yrs.forEach((y,i)=>s+=`<text x="${X(i)}" y="${H-4}" text-anchor="middle">${y}</text>`);
+  series.forEach(se=>{s+=`<polyline fill="none" stroke="${se.c}" stroke-width="2.2" stroke-linejoin="round" points="${se.d.map((v,i)=>X(i)+','+Y(v)).join(' ')}"/>`;se.d.forEach((v,i)=>s+=`<circle cx="${X(i)}" cy="${Y(v)}" r="2.5" fill="${se.c}"/>`)});
+  return s+'</svg>';
+}
+function barLine(bars,line,W,H,bc,lc){
+  const p=30,gw=(W-p*2)/5,bw=Math.min(20,gw/2),mb=Math.max(...bars)*1.1,ml=Math.max(...line)*1.1;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%">`;
+  bars.forEach((v,i)=>{const x=p+i*gw+gw/2,h=Math.max(v,0)/mb*(H-30);s+=`<rect x="${x-bw/2}" y="${H-16-h}" width="${bw}" height="${h}" rx="3" fill="${bc}"/><text x="${x}" y="${H-4}" text-anchor="middle">${yrs[i]}</text>`});
+  s+=`<polyline fill="none" stroke="${lc}" stroke-width="2.2" points="${line.map((v,i)=>(p+i*gw+gw/2)+','+(H-16-v/ml*(H-30))).join(' ')}"/>`;
+  line.forEach((v,i)=>s+=`<circle cx="${p+i*gw+gw/2}" cy="${H-16-v/ml*(H-30)}" r="2.5" fill="${lc}"/>`);
+  return s+'</svg>';
+}
+
+const card=(t,body,info)=>`<div class="card"><h3>${t}${info?'<span class="i">i</span>':''}</h3>${body}</div>`;
+const cardPerf=(c,W=520)=>card('業績',perfChart(c,W)+'<div class="note">左軸は売上高（兆円）、右軸は純利益（兆円）です。</div>');
+const cardBP=(c,W=520)=>card('収益構造',`<div class="sub" style="margin-top:0">事業利益の推移</div>`+bpChart(c,W)+`<div class="sub">前年度 → 今年度の要因</div>`+wfChart(c,W,150,undefined,false)+`<div class="legend"><span><i style="background:var(--bar)"></i>事業利益</span><span><i style="background:var(--pos)"></i>プラス要因</span><span><i style="background:var(--neg)"></i>マイナス要因</span></div><div class="note">事業利益は売上総利益 − 販管費です。開示されている営業利益と一致しない場合がございます。</div>`,true);
+const cardSeg=c=>card('セグメント別売上高',stackBar(c.seg));
+const cardReg=c=>card('地域別売上高',stackBar(c.reg));
+function cardCap(c,W=520){
+  const t=(l,a,f)=>`<tr><td>${l}</td>${a.slice(2).map(v=>`<td>${f(v)}</td>`).join('')}</tr>`;
+  return card('資本効率',`<div class="sub" style="margin-top:0">ROE・ROICの推移</div>`+lineChart([{c:'var(--roe)',d:c.roe},{c:'var(--bar)',d:c.roic}],W,110)+`<div class="legend"><span><i style="background:var(--roe)"></i>ROE ${c.roe[4]}%（25/3）</span><span><i style="background:var(--bar)"></i>ROIC ${c.roic[4]}%（25/3）</span></div><div class="sub">ROEのデュポン分解</div><table><tr><th></th>${yrs.slice(2).map(y=>`<th>${y}</th>`).join('')}</tr>${t('純利益率',c.nm,v=>v.toFixed(1)+'%')}${t('総資産回転率',c.to,v=>v.toFixed(2)+'回')}${t('財務レバレッジ',c.lev,v=>v.toFixed(2)+'倍')}${t('ROE',c.roe,v=>v+'%')}</table>`);
+}
+const cardCash=(c,W=520)=>card('資金配分',`<div class="sub" style="margin-top:0">フリーCF・ネットキャッシュの推移</div>`+barLine(c.fcf,c.nc,W,120,'var(--bar)','var(--line)')+`<div class="legend"><span><i style="background:var(--bar)"></i>フリーCF</span><span><i style="background:var(--line)"></i>ネットキャッシュ</span></div><div class="sub">フリーCFの使い道</div><table><tr><th>25/3</th><th>兆円</th></tr><tr><td>フリーCF</td><td>${c.fcf[4]}</td></tr><tr><td>財務CF</td><td>${(-c.fcf[4]*.7).toFixed(2)}</td></tr><tr><td>現金の増減</td><td class="best">${(c.fcf[4]*.3).toFixed(2)}</td></tr></table>`);
+const cardProd=(c,W=520)=>card('労働生産性',barLine(c.emp,c.spe,W,120,'var(--bar)','var(--line)')+`<div class="legend"><span><i style="background:var(--bar)"></i>従業員数（左軸）</span><span><i style="background:var(--line)"></i>1人あたり売上高（右軸）</span></div><div class="note">右軸の単位は百万円です。</div>`);
+const allCards=(c,W)=>cardPerf(c,W)+cardBP(c,W)+cardSeg(c)+cardReg(c)+cardCap(c,W)+cardCash(c,W)+cardProd(c,W);
+const seg=m=>`<div class="seg"><span class="${m==='full'?'on':''}" data-m="full" title="全画面"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/></svg></span><span class="${m==='dual'?'on':''}" data-m="dual" title="2つ表示"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="8" height="16" rx="2"/><rect x="13" y="4" width="8" height="16" rx="2"/></svg></span></div>`;
+const hdr=(c,o={})=>`<div class="hd2${o.search?' c':''}">${o.back?'<div class="backc" data-back="1">‹</div>':''}<div class="icon">${c.ic}</div><div class="tt"><div class="t">${c.n}</div><div class="s">${c.id} · ${c.sec}${o.focus?'<span class="focus-b">閉じると表示</span>':''}</div></div><div class="sp"></div>${o.search?'<div class="circ srch">⌕</div>':''}<div class="circ">☆</div>${o.toggle!==undefined?seg(o.toggle):''}</div><div class="ov">${c.ov}</div>`;
+
+let mode='master',selStep=1,focusSide='L';
+const dual={L:cos[0],R:cos[1]};
+const expl={'売上要因':['(当期売上 − 前期売上) × 前期粗利率','売上が増えた（減った）ことで、利益がどれだけ増えた（減った）か。'],'利益率要因':['当期売上 × (当期粗利率 − 前期粗利率)','同じ売上から残る利益の割合が変わったことで、利益がどれだけ増えた（減った）か。'],'販管費要因':['−(当期販管費 − 前期販管費)','販売費・一般管理費が増えれば利益は減り、減れば増える。']};
+const rows=()=>cos.map(c=>`<div class="co ${c===cur?'sel':''}" data-id="${c.id}"><div class="icon">${c.ic}</div><div class="mid"><div class="nm">${c.n}</div><div class="cd">${c.id} · ${c.sec}</div></div></div>`).join('');
+
+function detailHTML(m){
+  if(m==='full'){
+    const c=cur,d=wfData(c),names=d.map(x=>x[0].replace('\n','')),nm=names[selStep],e=expl[nm];
+    return `<div class="pane" style="flex:1">${hdr(c,{back:1,toggle:'full'})}<div class="pb"><div class="card"><h3>収益構造<span class="i">i</span></h3><div class="sub" style="margin-top:0">前年度 → 今年度（${yrs[3]} → ${yrs[4]}）の要因</div><div id="bigWf">${wfChart(c,520,300,selStep,true)}</div><div class="note">棒をタップすると右に要因の式と意味を表示します。事業利益は売上総利益 − 販管費です。</div></div><div class="cols">${cardPerf(c,270)}${cardSeg(c)}${cardReg(c)}${cardCap(c,270)}</div></div></div><div class="vsep"></div>
+    <div class="pane" style="width:262px;flex:none"><div class="ph" style="padding-top:46px">要因の説明</div><div class="pb">${d.map((x,k)=>`<div class="step ${k===selStep?'sel':''}" data-i="${k}"><span>${names[k]}</span><span>${x[2]==='t'?x[1]:sg(x[1])}兆円</span></div>`).join('')}${e?`<div class="note" style="margin-top:12px"><b>${nm}</b><div class="formula">${e[0]}</div>${e[1]}</div>`:`<div class="note" style="margin-top:12px"><b>${nm}</b><br>事業利益は売上総利益 − 販管費です。</div>`}<div class="note">3つの要因を足すと、前年度から今年度への増減になります。</div></div></div>`;
+  }
+  const pane=(side,o)=>{const c=dual[side];return `<div class="pane ${focusSide===side?'focus':''}" id="dual${side}" data-side="${side}">${hdr(c,{back:side==='L',search:1,focus:focusSide===side,toggle:o?'dual':undefined})}<div class="pb">${cardPerf(c,400)}${cardBP(c,400)}${cardSeg(c)}${cardCap(c,400)}</div></div>`};
+  return pane('L',false)+'<div class="vsep"></div>'+pane('R',true);
+}
+function renderList(){
+  const el=document.getElementById('s-list');
+  if(mode==='master'){
+    el.innerHTML=`<div class="pane" style="width:286px;flex:none"><div class="ph" style="font-size:13px">あなたの追加した企業<span class="menu" style="font-size:12px;white-space:nowrap">すべて（6）▾</span></div><div class="pb">${rows()}</div></div><div class="vsep"></div>
+    <div class="pane" style="flex:1">${hdr(cur,{toggle:''})}<div class="pb"><div class="cols">${allCards(cur,270)}</div></div></div>`;
+  }else el.innerHTML=detailHTML(mode);
+}
+function enterMode(m,base){
+  mode=mode===m?base:m;
+  if(mode==='dual'){dual.L=cur;if(dual.R===cur||!dual.R)dual.R=cos.find(c=>c!==cur);}
+}
+function detailClick(e,ctx){
+  const t=e.target,rerender=ctx==='home'?renderHome:renderList,base=ctx==='home'?'single':'master';
+  if(t.closest('.pop')&&!t.closest('.it'))return;
+  const m=t.closest('[data-m]');if(m){const prev=mode;mode=prev===m.dataset.m?base:m.dataset.m;if(mode==='dual'){dual.L=cur;if(!dual.R||dual.R===cur)dual.R=all.find(c=>c!==cur&&cos.includes(c))}rerender();return}
+  if(t.closest('[data-back]')){mode=base;rerender();return}
+  const co=t.closest('.co');if(co&&ctx==='list'){cur=cos.find(c=>c.id===co.dataset.id);rerender();return}
+  const wb=t.closest('.wb');if(wb){selStep=+wb.dataset.i;rerender();return}
+  const st=t.closest('.step');if(st){selStep=+st.dataset.i;rerender();return}
+  const sel=t.closest('.srch');if(sel){openPop(sel.closest('.pane').dataset.side,rerender);return}
+  const pane=t.closest('.pane[data-side]');if(pane&&!t.closest('.it')){focusSide=pane.dataset.side;rerender()}
+}
+document.getElementById('s-list').addEventListener('click',e=>detailClick(e,'list'));
+function openPop(side,rerender){
+  const el=document.getElementById('dual'+side),other=dual[side==='L'?'R':'L'];
+  el.querySelectorAll('.pop').forEach(x=>x.remove());
+  const pop=document.createElement('div');pop.className='pop';
+  pop.innerHTML=`<div class="inp">⌕<input placeholder="銘柄名・コードで検索"></div><div class="res"></div>`;el.appendChild(pop);
+  const input=pop.querySelector('input'),res=pop.querySelector('.res');
+  const draw=q=>{q=q.trim();const hit=all.filter(c=>!q||c.n.includes(q)||c.id.includes(q));
+    const row=c=>`<div class="it ${c===other||c===dual[side]?'cur':''}" data-id="${c.id}"><div class="icon">${c.ic}</div>${c.n}<span class="cd">${c.id}${c===other?' · 反対側で表示中':''}</span></div>`;
+    res.innerHTML=q?(hit.length?hit.map(row).join(''):'<div class="hd">該当なし</div>'):`<div class="hd">あなたの追加した企業</div>${cos.map(row).join('')}<div class="hd">最近見た銘柄</div>${more.map(row).join('')}`;
+    res.querySelectorAll('.it:not(.cur)').forEach(i=>i.onclick=ev=>{ev.stopPropagation();dual[side]=all.find(c=>c.id===i.dataset.id);focusSide=side;rerender()})};
+  input.oninput=()=>draw(input.value);draw('');input.focus();
+}
+
+
+/* ---- ホーム（検索 + feed/update） ---- */
+let hq='',hsel=null;
+const feedItems=[['7203','11/21'],['8035','11/21'],['7974','11/20'],['6758','11/20'],['9983','11/20'],['6594','11/19'],['7267','11/19'],['7269','11/18'],['7270','11/18'],['6861','11/18'],['7261','11/15'],['7201','11/15']];
+const co_=id=>all.find(c=>c.id===id);
+const hist=()=>[co_('7203'),co_('6861'),co_('9983'),co_('7974')];
+const rowS=c=>`<div class="co" data-hid="${c.id}"><div class="icon">${c.ic}</div><div class="mid"><div class="nm">${c.n}</div><div class="cd">${c.id} · ${c.sec}</div></div></div>`;
+function homeLeft(){
+  const q=hq.trim();
+  if(!q)return `<div class="ph" style="font-size:13px;padding-top:12px">最近あなたが調べた企業</div>`+hist().map(rowS).join('');
+  const hit=all.filter(c=>c.n.includes(q)||c.id.includes(q));
+  return `<div class="ph" style="font-size:13px;padding-top:12px">検索候補</div>`+(hit.length?hit.map(rowS).join(''):'<div class="note" style="padding:6px 14px">該当する企業がありません</div>');
+}
+function renderHome(){
+  const el=document.getElementById('s-home');
+  if(hsel&&mode!=='single'){el.innerHTML=detailHTML(mode);return}
+  const right=hsel?`${hdr(hsel,{back:1,toggle:''})}<div class="pb"><div class="cols">${allCards(hsel,270)}</div></div>`
+   :`<div class="ph" style="padding-top:42px"></div><div class="pb"><div class="fh"><span>最近有報が更新された企業</span><span class="live"><i></i>更新 11/22 21:00</span></div><div class="card" style="padding:6px 16px;margin-bottom:0">${feedItems.map(([id,d])=>{const c=co_(id);return `<div class="hrow" data-hid="${c.id}"><div class="icon" style="width:36px;height:36px">${c.ic}</div><div style="flex:1;min-width:0"><div class="nm">${c.n}</div><div class="cd">${c.id}</div></div><div class="d"><small>提出日</small>${d}</div><span class="ch">›</span></div>`}).join('')}</div><div class="note" style="text-align:center">約12社 · 2週間分。スクロールで続き（現行は6社ずつのページ送り）</div></div>`;
+  el.innerHTML=`<div class="pane" style="width:300px;flex:none"><div class="ph" style="padding-bottom:10px"><span style="font-size:17px;color:var(--text);font-weight:700">検索</span><span class="circ" style="width:34px;height:34px;font-size:14px" title="履歴">◷</span></div><div class="sbar">⌕<input id="hin" placeholder="会社名・銘柄コード" value="${hq}"><span id="hclr" style="color:var(--muted);cursor:pointer;${hq?'':'display:none'}">⊗</span></div><div class="pb" id="hres">${homeLeft()}</div></div><div class="vsep"></div><div class="pane" style="flex:1">${right}</div>`;
+  const inp=document.getElementById('hin');
+  inp.oninput=()=>{hq=inp.value;document.getElementById('hres').innerHTML=homeLeft();document.getElementById('hclr').style.display=hq?'':'none'};
+  document.getElementById('hclr').onclick=()=>{hq='';renderHome();document.getElementById('hin').focus()};
+}
+document.getElementById('s-home').addEventListener('click',e=>{
+  const r=e.target.closest('[data-hid]');if(r){hsel=co_(r.dataset.hid);cur=hsel;mode='single';renderHome();return}
+  if(hsel&&mode==='single'&&e.target.closest('[data-back]')){hsel=null;renderHome();return}
+  if(hsel){detailClick(e,'home')}
+});
+const banks=[
+ {id:'8306',n:'三菱UFJ FG',ic:'三',m:{ldr:56,ohr:60,deposits:215,loans:120,nii:2.4,fee:2.1,gbp:5.9}},
+ {id:'8316',n:'三井住友FG',ic:'住',m:{ldr:62,ohr:58,deposits:140,loans:92,nii:1.9,fee:1.6,gbp:4.3}},
+ {id:'8411',n:'みずほFG',ic:'み',m:{ldr:48,ohr:64,deposits:150,loans:78,nii:1.5,fee:1.1,gbp:3.1}},
+ {id:'8308',n:'りそなHD',ic:'り',m:{ldr:66,ohr:67,deposits:58,loans:39,nii:0.8,fee:0.4,gbp:1.3}},
+ {id:'8331',n:'千葉銀行',ic:'千',m:{ldr:72,ohr:54,deposits:15,loans:11,nii:0.3,fee:0.1,gbp:0.43}},
+ {id:'8354',n:'ふくおかFG',ic:'ふ',m:{ldr:77,ohr:62,deposits:23,loans:17,nii:0.4,fee:0.2,gbp:0.62}},
+];
+const metrics=[['ldr','預貸率','%',true,'貸出金 ÷ 預金（期末）。高いほど預金を貸出に回している'],['ohr','経費率（OHR）','%',false,'経費 ÷ 業務粗利益。低いほど効率的'],['deposits','預金','兆円',true,'期末残高'],['loans','貸出金','兆円',true,'期末残高'],['nii','資金利益','兆円',true,'貸出・有価証券の利ざや収益'],['fee','役務取引等利益','兆円',true,'手数料ビジネスの利益'],['gbp','業務粗利益','兆円',true,'資金・役務・特定取引・その他の合計']];
+const spk=a=>{const mn=Math.min(...a),mx=Math.max(...a),w=44,h=18;return `<svg width="${w}" height="${h}"><polyline fill="none" stroke="#8a8f98" stroke-width="1.5" points="${a.map((v,i)=>(i/4*w)+','+(h-2-(v-mn)/((mx-mn)||1)*(h-4))).join(' ')}"/></svg>`};
+const hist5=(b,k)=>{const d=((b.id.charCodeAt(3)+k.length*3)%7-3)*0.018;return [0,1,2,3,4].map(i=>+(b.m[k]*(1+(i-4)*d+((i*7+b.id.charCodeAt(2))%5-2)*.004)).toFixed(b.m[k]<10?2:1)).map((v,i,a)=>i===4?b.m[k]:v)};
+let mi=0;const pins=new Set(['8306','8316','8331']);
+function renderCmp(){
+  const [k,t,u,hi,cap]=metrics[mi];
+  document.getElementById('mchips').innerHTML=metrics.map((m,i)=>`<div class="chip ${i===mi?'sel':''}" data-i="${i}">${m[1]}</div>`).join('');
+  document.querySelectorAll('#mchips .chip').forEach(e=>e.onclick=()=>{mi=+e.dataset.i;renderCmp()});
+  const list=[...banks].sort((a,b)=>hi?b.m[k]-a.m[k]:a.m[k]-b.m[k]),mx=Math.max(...banks.map(b=>b.m[k]));
+  document.getElementById('rank').innerHTML=list.map((b,i)=>`<div class="rk ${pins.has(b.id)?'pin':''}" data-id="${b.id}"><div class="rank">${i+1}</div><div class="icon" style="width:30px;height:30px;font-size:12px">${b.ic}</div><div class="mid"><div class="nm">${b.n}</div><div class="bar"><i style="width:${b.m[k]/mx*100}%"></i></div></div><div class="spk">${spk(hist5(b,k))}</div><div class="val">${b.m[k]}${u==='%'?'%':'<small style="font-size:10px;color:var(--muted)">'+u+'</small>'}</div><div class="pinb">${pins.has(b.id)?'✓':'+'}</div></div>`).join('');
+  document.querySelectorAll('#rank .rk').forEach(e=>e.onclick=()=>{const id=e.dataset.id;if(pins.has(id)){if(pins.size>1)pins.delete(id)}else{if(pins.size>=4)pins.delete([...pins][0]);pins.add(id)}renderCmp()});
+  const sel=banks.filter(b=>pins.has(b.id)),colors=['#59b3f2','#47c76b','#fad11f','#c58bff'];
+  document.getElementById('pinSub').textContent=`ピン留め ${sel.length}行`;
+  document.getElementById('cmpTitle').textContent=t;
+  document.getElementById('cmpCap').textContent=cap;
+  const m2=Math.max(...sel.map(b=>b.m[k]));
+  document.getElementById('cmpBars').innerHTML=sel.map((b,i)=>`<div style="display:flex;align-items:center;gap:10px;margin:8px 0;font-size:12px"><span style="width:84px;color:var(--muted)">${b.n}</span><div style="flex:1;height:10px;border-radius:5px;background:#ffffff14;overflow:hidden"><i style="display:block;height:100%;width:${b.m[k]/m2*100}%;background:${colors[i]};border-radius:5px"></i></div><b style="width:60px;text-align:right;font-variant-numeric:tabular-nums">${b.m[k]}${u==='%'?'%':u}</b></div>`).join('');
+  document.getElementById('cmpLine').innerHTML=lineChart(sel.map((b,i)=>({c:colors[i],d:hist5(b,k)})),520,130,false);
+  document.getElementById('cmpLeg').innerHTML=sel.map((b,i)=>`<span><i style="background:${colors[i]}"></i>${b.n}</span>`).join('');
+  document.getElementById('cmpTable').innerHTML=`<table><tr><th></th>${sel.map((b,i)=>`<th><span class="dot" style="background:${colors[i]}"></span>${b.n}</th>`).join('')}</tr>`+metrics.map(([mk,mt,mu,mh])=>{const vals=sel.map(b=>b.m[mk]),best=mh?Math.max(...vals):Math.min(...vals);return `<tr><td>${mt}</td>${sel.map(b=>`<td class="${b.m[mk]===best?'best':''}">${b.m[mk]}${mu==='%'?'%':''}</td>`).join('')}</tr>`}).join('')+'</table>';
+}
+
+
+
+/* ---- 外側（現行iOSと同じ構成） ---- */
+let oPage=0,oCmp=false;
+function oSwitch(id){document.querySelectorAll('.ostack').forEach(x=>x.classList.toggle('on',x.id==='o-'+id));document.querySelectorAll('.otab').forEach(x=>x.classList.toggle('on',x.dataset.o===id));document.getElementById('o-ticker').dataset.from=id}
+let oFrom='home',oOv=null;
+let oCur=null;
+function oOpen(id,from){const c=co_(id);oCur=c;oFrom=from||(document.querySelector('.ostack.on')?document.querySelector('.ostack.on').id.slice(2):'home');
+  document.getElementById('oIcon').textContent=c.ic;document.getElementById('oName').textContent=c.n;document.getElementById('oSub').textContent=c.id+' · '+c.sec;
+  oOv=c;document.getElementById('oBody').innerHTML=`<div id="oOvCard"></div>`+cardPerf(c,360)+cardBP(c,360)+cardSeg(c)+cardReg(c)+cardCap(c,360)+cardCash(c,360)+cardProd(c,360);
+  document.getElementById('oOvCard').innerHTML='';
+  document.querySelectorAll('.ostack').forEach(x=>x.classList.toggle('on',x.id==='o-ticker'));}
+function renderOuter(){
+  const pages=[];for(let i=0;i<feedItems.length;i+=6)pages.push(feedItems.slice(i,i+6));
+  const pg=pages[oPage];
+  document.getElementById('oHomeBody').innerHTML=`<div class="fh" style="padding-top:4px"><span>最近有報が更新された企業</span></div><div class="card" style="padding:6px 14px;margin-bottom:0">${pg.map(([id,d])=>{const c=co_(id);return `<div class="hrow" data-oid="${c.id}"><div class="icon" style="width:36px;height:36px">${c.ic}</div><div style="flex:1;min-width:0"><div class="nm">${c.n}</div><div class="cd">${c.id}</div></div><div class="d"><small>提出日</small>${d}</div><span class="ch">›</span></div>`}).join('')}</div><div class="dots">${pages.map((_,i)=>`<i class="${i===oPage?'on':''}" data-pg="${i}"></i>`).join('')}</div>`;
+  document.getElementById('oListBody').innerHTML=`<div class="fh" style="padding-top:4px"><span>あなたの追加した企業</span><span class="menu" style="color:var(--text)">すべて（6）▾</span></div><div class="tiles">${cos.map(c=>`<div class="tile" data-oid="${c.id}"><div class="icon">${c.ic}</div><div class="n">${c.n}</div><div class="c">${c.id}</div></div>`).join('')}</div>`;
+  if(!oCmp)document.getElementById('oCmpBody').innerHTML=`<div class="fh" style="padding-top:4px"><span>比較したい業種を選択</span></div><div class="card" style="padding:8px 12px"><div class="grp" id="oGrp" style="background:none;margin:0"><div class="sym">🏛</div><b>銀行</b><span class="sp"></span><span style="color:var(--idle)">›</span></div></div>`;
+}
+function oBank(){
+  oCmp=true;document.getElementById('oCmpT').textContent='銀行';
+  const [k,t,u,hi]=metrics[mi],list=[...banks].sort((a,b)=>hi?b.m[k]-a.m[k]:a.m[k]-b.m[k]),mx=Math.max(...banks.map(b=>b.m[k]));
+  document.getElementById('oCmpBody').innerHTML=`<div class="chips">${metrics.map((m,i)=>`<div class="chip ${i===mi?'sel':''}" data-oi="${i}">${m[1]}</div>`).join('')}</div><div class="card" style="padding:6px 8px">${list.map((b,i)=>`<div class="rk"><div class="rank">${i+1}</div><div class="icon" style="width:30px;height:30px;font-size:12px">${b.ic}</div><div class="mid"><div class="nm">${b.n}</div><div class="bar"><i style="width:${b.m[k]/mx*100}%"></i></div></div><div class="val">${b.m[k]}${u==='%'?'%':'<small style="font-size:10px;color:var(--muted)">'+u+'</small>'}</div></div>`).join('')}</div><div class="note">${metrics[mi][4]}</div>`;
+}
+document.querySelector('.outer').addEventListener('click',e=>{
+  const t=e.target,tab=t.closest('.otab');
+  if(tab){oCmp=false;renderOuter();oSwitch(tab.dataset.o);return}
+  const r=t.closest('[data-oid]');if(r){oOpen(r.dataset.oid);return}
+  const pg=t.closest('[data-pg]');if(pg){oPage=+pg.dataset.pg;renderOuter();return}
+  if(t.closest('#oGrp')){oBank();return}
+  const ch=t.closest('[data-oi]');if(ch){mi=+ch.dataset.oi;oBank();return}
+  if(t.closest('#oback')){oSwitch(oFrom);return}
+  if(t.closest('#oPill')&&oOv){const h=document.getElementById('oOvCard');h.innerHTML=h.innerHTML?'':`<div class="card" style="border-radius:26px"><div style="font-size:12px;color:var(--muted);margin-bottom:6px">${oOv.id} · ${oOv.sec}</div><div class="ovx" style="padding:0">${oOv.ov}</div></div>`}
+});
+
+/* ---- 開閉で対応画面に切り替わる ---- */
+const innerTab=()=>document.querySelector('.rail .tab.on').dataset.s;
+const flash=sel=>{const e=document.querySelector(sel);e.classList.remove('flash');void e.offsetWidth;e.classList.add('flash')};
+function fold(){
+  const t=innerTab();
+  if(t==='home'){ if(hsel&&mode!=='single'||hsel)oOpen((mode==='dual'?dual[focusSide]:hsel).id,'home'); else{oCmp=false;renderOuter();oSwitch('home')} }
+  else if(t==='list'){oOpen((mode==='dual'?dual[focusSide]:cur).id,'list')}
+  else{oBank();oSwitch('compare')}
+  flash('.outer');
+}
+function unfold(){
+  const act=document.querySelector('.ostack.on').id.slice(2);
+  const go=s=>document.querySelector(`.rail .tab[data-s=${s}]`).click();
+  if(act==='ticker'){const c=oCur;
+    if(oFrom==='list'&&cos.includes(c)){go('list');cur=c;mode='master';renderList()}
+    else{go('home');hsel=c;cur=c;mode='single';renderHome()}}
+  else if(act==='home'){go('home');hsel=null;renderHome()}
+  else if(act==='list'){go('list')}
+  else go('compare');
+  flash('.duo');
+}
+document.getElementById('foldBtn').onclick=fold;document.getElementById('unfoldBtn').onclick=unfold;
+document.querySelectorAll('.rail .tab').forEach(t=>t.onclick=()=>{if(t.dataset.s==='list'){mode='master';renderList()}else if(t.dataset.s==='home'){mode='single';renderHome()}document.querySelectorAll('.rail .tab').forEach(x=>x.classList.toggle('on',x===t));document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id==='s-'+t.dataset.s))});
+renderHome();renderList();renderCmp();renderOuter();
+const h=new URLSearchParams(location.search).get('s');if(h)document.querySelector(`.rail .tab[data-s="${h}"]`).click();
+</script>
+</body>
+</html>

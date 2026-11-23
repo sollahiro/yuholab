@@ -46,7 +46,7 @@ enum TopRoute: Hashable {
     case history
 }
 
-/// トップ。左上にロゴ、右上に検索と履歴。本文は最近有報が更新された企業のキュレーション。
+/// トップ。右上に検索と履歴。本文は最近有報が更新された企業のキュレーション。
 /// 検索を押すと上部が検索バーに変わり、未入力なら履歴、入力中は会社名の候補を出す。
 struct TopView: View {
     @Binding var query: String
@@ -72,10 +72,6 @@ struct TopView: View {
         .bltChrome("")
         .toolbar(searching ? .hidden : .visible, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                YuhoLabLogo()
-            }
-            .sharedBackgroundVisibility(.hidden)
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
                     withAnimation(.snappy(duration: 0.22)) { searching = true }

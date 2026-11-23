@@ -300,3 +300,26 @@ extension View {
     }
 }
 
+
+// MARK: - 大画面（iPad / iPhone Duo 内側 / 横向き / Split View）
+
+extension Theme {
+    /// 本文の読みやすい最大幅。これより広い画面では左右に余白を足して中央に寄せる。
+    static let readableMaxWidth: CGFloat = 720
+}
+
+private struct ReadableWidthModifier: ViewModifier {
+    @State private var width: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            // スクロール領域そのものは画面端まで広げ、内容だけを最大幅で中央へ寄せる。
+            .contentMargins(.horizontal, max(0, (width - Theme.readableMaxWidth) / 2), for: .scrollContent)
+    }
+}
+
+extension View {
+    /// 幅が `Theme.readableMaxWidth` を超えるとき、スクロール内容を中央に寄せる。compact 幅では何もしない。
+    func readableWidth() -> some View { modifier(ReadableWidthModifier()) }
+}

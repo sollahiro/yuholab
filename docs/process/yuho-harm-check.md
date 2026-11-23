@@ -11,7 +11,7 @@
 ## 手順（短い）
 
 1. 対象の有報（PDF / 原本 HTML / XBRL）を開く。
-2. 同じ会社・同じ通期について、公開面（`https://api.yuholab.com/v1/` または公開 MCP）の値を取る。認証は `docs/api-auth.md`。
+2. 同じ会社・同じ通期について、公開面（`https://api.yuholab.com/v1/` または公開 MCP）の値を取る。認証は `docs/api-auth.md`。REST は `GET /v1/skills` で能力カタログ、`GET /v1/skills/{id}` で各エンドポイントの詳細を見る。銘柄コード不明なら `GET /v1/companies?q=` で検索する（未集計は 404、DB 非接続は 503）。
 3. 食い違いがあれば、コード・書類・フィールド・期待値と実際の値・出典箇所を記録する。
 4. 記録先はオーナー管理のトラッカー Sheet（タブ「実害トラッカー」。必要なら「原文・判断履歴」。URL は `docs/process/tracker-placement.md`）。コード修正が要るときは GitHub Issue を立て、Sheet に URL を残す。
 5. テストの golden は、**実害が出た行の正しい答えだけ**足す。網羅的な golden を書かない。

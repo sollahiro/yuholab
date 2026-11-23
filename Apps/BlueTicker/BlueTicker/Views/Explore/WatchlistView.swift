@@ -35,7 +35,14 @@ struct WatchlistView: View {
     @State private var trashFrame: CGRect = .zero
     @State private var contentOrigin: CGPoint = .zero
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10, alignment: .top), count: 3)
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
+    /// 縦向きは 3 列。横向き（高さが compact）は 6 列にして、一覧をコンパクトにする。
+    private var columns: [GridItem] {
+        Array(
+            repeating: GridItem(.flexible(), spacing: 10, alignment: .top),
+            count: verticalSizeClass == .compact ? 6 : 3)
+    }
 
     var body: some View {
         ScrollView {

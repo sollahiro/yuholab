@@ -49,6 +49,13 @@
 		AA0000000000000000000085 /* BenchmarkCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000085 /* BenchmarkCatalog.swift */; };
 		AA0000000000000000000086 /* CompareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000086 /* CompareView.swift */; };
 		AA0000000000000000000087 /* BenchmarkRankingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000087 /* BenchmarkRankingView.swift */; };
+		AA0000000000000000000100 /* LargeScreenModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000100 /* LargeScreenModel.swift */; };
+		AA0000000000000000000101 /* CompanySearchPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000101 /* CompanySearchPanel.swift */; };
+		AA0000000000000000000102 /* RegularTickerPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000102 /* RegularTickerPane.swift */; };
+		AA0000000000000000000103 /* DualTickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000103 /* DualTickerView.swift */; };
+		AA0000000000000000000104 /* RegularHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000104 /* RegularHomeView.swift */; };
+		AA0000000000000000000105 /* RegularListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000105 /* RegularListView.swift */; };
+		AA0000000000000000000106 /* RegularCompareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000106 /* RegularCompareView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -99,6 +106,13 @@
 		BB0000000000000000000085 /* BenchmarkCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchmarkCatalog.swift; sourceTree = "<group>"; };
 		BB0000000000000000000086 /* CompareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareView.swift; sourceTree = "<group>"; };
 		BB0000000000000000000087 /* BenchmarkRankingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchmarkRankingView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000100 /* LargeScreenModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LargeScreenModel.swift; sourceTree = "<group>"; };
+		BB0000000000000000000101 /* CompanySearchPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanySearchPanel.swift; sourceTree = "<group>"; };
+		BB0000000000000000000102 /* RegularTickerPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegularTickerPane.swift; sourceTree = "<group>"; };
+		BB0000000000000000000103 /* DualTickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DualTickerView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000104 /* RegularHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegularHomeView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000105 /* RegularListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegularListView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000106 /* RegularCompareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegularCompareView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -184,6 +198,7 @@
 				BB0000000000000000000021 /* VersionMarkFooter.swift */,
 				BB0000000000000000000010 /* SettingsView.swift */,
 				DD0000000000000000000007 /* Explore */,
+				DD0000000000000000000A01 /* Large */,
 				DD0000000000000000000008 /* Ticker */,
 			);
 			path = Views;
@@ -255,6 +270,20 @@
 			);
 			name = FeedRSS;
 			path = FeedRSS/Sources/FeedRSS;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000A01 /* Large */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000100 /* LargeScreenModel.swift */,
+				BB0000000000000000000101 /* CompanySearchPanel.swift */,
+				BB0000000000000000000102 /* RegularTickerPane.swift */,
+				BB0000000000000000000103 /* DualTickerView.swift */,
+				BB0000000000000000000104 /* RegularHomeView.swift */,
+				BB0000000000000000000105 /* RegularListView.swift */,
+				BB0000000000000000000106 /* RegularCompareView.swift */,
+			);
+			path = Large;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -368,6 +397,13 @@
 				AA0000000000000000000040 /* FeedRSS.swift in Sources */,
 				AA0000000000000000000041 /* FeedRSSStore.swift in Sources */,
 				AA0000000000000000000088 /* BenchmarkStaticStore.swift in Sources */,
+				AA0000000000000000000100 /* LargeScreenModel.swift in Sources */,
+				AA0000000000000000000101 /* CompanySearchPanel.swift in Sources */,
+				AA0000000000000000000102 /* RegularTickerPane.swift in Sources */,
+				AA0000000000000000000103 /* DualTickerView.swift in Sources */,
+				AA0000000000000000000104 /* RegularHomeView.swift in Sources */,
+				AA0000000000000000000105 /* RegularListView.swift in Sources */,
+				AA0000000000000000000106 /* RegularCompareView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -489,7 +525,7 @@
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "同じ Wi-Fi 上の開発サーバーに接続します。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -524,7 +560,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

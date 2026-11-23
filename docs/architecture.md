@@ -1,6 +1,6 @@
 # システムアーキテクチャ
 
-**現構成の正本**（箱・依存・エンドポイント）。方針は `blt-server-roadmap.md`、進捗はオーナー管理のトラッカー Sheet（`docs/process/tracker-placement.md` / `docs/status/README.md`）、cache 床は各 Contract 定数（バンプ規則は `.agents/rules/versioning.md`）、経緯は Git。
+**現構成の正本**（箱・依存・エンドポイント）。方針は `blt-server-roadmap.md`、進捗はオーナー管理のトラッカー Sheet（`docs/process/tracker-placement.md`）、cache 床は各 Contract 定数（バンプ規則は `.agents/rules/versioning.md`）、経緯は Git。
 
 ## 提供面
 

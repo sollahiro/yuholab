@@ -339,17 +339,18 @@ import Testing
               "comparable_regions":[{"region":"japan","value":100},{"region":"americas","value":40}]},
              {"fy_end":"2025-03-31","comparable_group":0,"line_cut":false,
               "regions":[{"label":"日本","region":"japan","value":90},{"label":"米国","region":"united_states","value":41}],
-              "comparable_regions":[{"region":"japan","value":90},{"region":"americas","value":41}]},
+              "comparable_regions":[{"region":"japan","members":["japan"],"value":90},{"region":"americas","members":["united_states"],"value":41}]},
              {"fy_end":"2024-03-31","comparable_group":1,"line_cut":true,
               "regions":[{"label":"日本","region":"japan","value":80},{"label":"米州","region":"americas","value":42}],
-              "comparable_regions":[{"region":"japan","value":80},{"region":"americas","value":42}]}]}
+              "comparable_regions":[{"region":"japan","members":["japan"],"value":80},{"region":"americas","members":["americas"],"value":42}]}]}
             """
         let response = try JSONDecoder().decode(GeographyWaterfallResponse.self, from: Data(json.utf8))
         let cols = BreakdownBuilder.geographyColumns(response) { $0.fyEnd ?? "" }
         #expect(cols.map(\.label) == ["2024-03-31", "2025-03-31", "2026-03-31"])
-        // 塊が変わる 25/03 だけ「再編」。つなぎも切れる。
+        // 塊が変わる 25/03 だけ「再編」。構成が変わった米州は切れ、同じ構成の日本はつながる。
         #expect(cols.map(\.reorged) == [false, true, false])
-        #expect(cols[1].items.allSatisfy { $0.link == .none })
+        #expect(cols[1].items.first { $0.key == "americas" }?.link == BreakdownLink.none)
+        #expect(cols[1].items.first { $0.key == "japan" }?.link == .connect("japan"))
         #expect(cols[2].items.first { $0.key == "americas" }?.link == .connect("americas"))
         // 表示名: 開示のままの名前、無ければコードの表示名（25/03 は米国→米州）。
         #expect(cols[1].items.first { $0.key == "americas" }?.label == "米州")

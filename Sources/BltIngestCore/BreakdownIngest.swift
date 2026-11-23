@@ -1,10 +1,9 @@
-// 内訳取り込み: 上場企業の有報について軸別（product_service / geography 等）の内訳を解決し
+// 内訳取り込み: 上場企業の有報について軸別（segment / geography 等）の内訳を解決し
 // company_breakdowns へ upsert する。解決は BlueTickerCore のファサード
 // （resolveSegmentBreakdown / resolveGeographyBreakdown）に委譲し、ここでは対象選定・
 // staleness 判定・DB upsert のみを担う（ネットワーク非依存でテスト可能）。
-// 呼び出し元（FactsIngest）が product_service → geography の順で本関数を呼ぶ。
-// REST/MCP の read（loadStoredBreakdown）は product_service / geography の両軸を公開する
-// （2026-07-27、品質ゲート＝最新有報の needs_review=true・あいまい失敗0を確認のうえ解禁）。
+// 呼び出し元（FactsIngest）が軸ごとに本関数を呼ぶ。
+// REST/MCP の read（loadStoredBreakdown）は segment / geography ほか公開軸を返す。
 //
 // 対象母集団は呼び出し元が `listedCodes` に渡す集合。全軸とも上場全体
 // （2026-09: employees/rd/goodwill・報告セグメント別指標軸も日経225限定を廃止して拡大）。
