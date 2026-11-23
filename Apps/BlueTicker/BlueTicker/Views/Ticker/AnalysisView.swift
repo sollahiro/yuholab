@@ -3,8 +3,18 @@ import SwiftUI
 
 /// 銘柄の分析結果。業績・収益構造・セグメント・地域・資本効率・資金配分・労働生産性を縦に並べ、スクロールで見る。
 /// 入力は Waterfall（`/waterfall`）。Summary の水準値に前年差を足した上位集合なので 1 本で足りる。
+/// 分析カードの並べ方。`.single` が現行（縦 1 列）。大画面だけ他を使う。
+enum AnalysisLayout {
+    case single
+    /// 2 列。左右に高さが偏りにくい組み合わせで振り分ける。
+    case twoColumn
+    /// 収益構造のウォーターフォールだけを広く出し、右に要因の式と意味を常時出す。
+    case waterfall
+}
+
 struct AnalysisView: View {
     var code: String
+    var layout: AnalysisLayout = .single
     @State private var response: FinancialsResponse?
     @State private var errorMessage: String?
     @State private var breakdown: BreakdownModel?
@@ -21,7 +31,11 @@ struct AnalysisView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .task { await load() }
+        .task(id: code) {
+            response = nil
+            errorMessage = nil
+            await load()
+        }
         // 内訳カードは財務データとは別に取る。失敗してもカードを出さないだけ。
         .task(id: code) {
             breakdown = nil
@@ -33,15 +47,42 @@ struct AnalysisView: View {
         let years = Format.chronological(response.years)
         let currency = response.currency ?? Format.latestYear(response.years)?.currency
         return ScrollView {
-            VStack(spacing: Theme.cardContentInset) {
-                PerformanceSection(years: years, currency: currency)
-                BusinessProfitSection(years: years, currency: currency)
-                BreakdownSections(model: breakdown)
-                CapitalEfficiencySection(years: years)
-                CashAllocationSection(years: years, currency: currency)
-                ProductivitySection(years: years, currency: currency)
+            switch layout {
+            case .single:
+                VStack(spacing: Theme.cardContentInset) {
+                    PerformanceSection(years: years, currency: currency)
+                    BusinessProfitSection(years: years, currency: currency)
+                    BreakdownSections(model: breakdown)
+                    CapitalEfficiencySection(years: years)
+                    CashAllocationSection(years: years, currency: currency)
+                    ProductivitySection(years: years, currency: currency)
+                }
+                .padding(Theme.cardContentInset)
+            case .twoColumn:
+                HStack(alignment: .top, spacing: Theme.cardContentInset) {
+                    VStack(spacing: Theme.cardContentInset) {
+                        PerformanceSection(years: years, currency: currency)
+                        BreakdownSections(model: breakdown)
+                        ProductivitySection(years: years, currency: currency)
+                    }
+                    VStack(spacing: Theme.cardContentInset) {
+                        BusinessProfitSection(years: years, currency: currency)
+                        CapitalEfficiencySection(years: years)
+                        CashAllocationSection(years: years, currency: currency)
+                    }
+                }
+                .padding(Theme.cardContentInset)
+            case .waterfall:
+                HStack(alignment: .top, spacing: Theme.cardContentInset) {
+                    BusinessProfitSection(years: years, currency: currency)
+                        .frame(maxWidth: .infinity)
+                    ProfitBridgeExplainer(embedded: true)
+                        .frame(width: 300)
+                        .padding(20)
+                        .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cardCornerRadius, style: .continuous))
+                }
+                .padding(Theme.cardContentInset)
             }
-            .padding(Theme.cardContentInset)
         }
         .scrollIndicators(.hidden)
     }
@@ -1355,8 +1396,10 @@ private struct CashAllocationSection: View {
 }
 
 /// 事業利益の要因分解の説明。i ボタンから開くポップアップ。例の数字で図解する。
-private struct ProfitBridgeExplainer: View {
+struct ProfitBridgeExplainer: View {
     @Environment(\.dismiss) private var dismiss
+    /// 大画面の全画面表示では、シートではなくカードの中へ並べる（ナビ・閉じるなし）。
+    var embedded = false
 
     private struct Bar: Identifiable {
         var title: String
@@ -1399,8 +1442,26 @@ private struct ProfitBridgeExplainer: View {
     ]
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
+        if embedded {
+            explanationContent
+        } else {
+            NavigationStack {
+                ScrollView {
+                    explanationContent
+                        .padding(20)
+                }
+                .navigationTitle("事業利益の要因分解")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("閉じる") { dismiss() }
+                    }
+                }
+            }
+        }
+    }
+
+    private var explanationContent: some View {
                 VStack(alignment: .leading, spacing: 20) {
                     Text("前年度から今年度への事業利益の増減を、3 つの要因に分けて見ます。")
                         .font(.subheadline)
@@ -1430,16 +1491,6 @@ private struct ProfitBridgeExplainer: View {
                         .font(.footnote)
                         .foregroundStyle(Theme.textMuted)
                 }
-                .padding(20)
-            }
-            .navigationTitle("事業利益の要因分解")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("閉じる") { dismiss() }
-                }
-            }
-        }
     }
 
     private var exampleChart: some View {
