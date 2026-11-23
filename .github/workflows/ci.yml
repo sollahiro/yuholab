@@ -92,14 +92,16 @@ jobs:
   ios:
     # Apps/BlueTicker は SwiftPM 外。このジョブは macos runner。Linux 環境では走らない。
     # サーバーの swift test とはジョブを分けて並列に回し、サーバー CI を遅らせない。
-    # iOS 26 SDK は macos-26 イメージの既定 Xcode 26.6 に入っている。
+    # 大画面（iPhone Duo）対応で iOS 27.1 SDK 限定の API（ArrangementView など）を使うため、Xcode 27 のイメージ
+    # `xcode-27`（既定 Xcode 27.1、iOS 27.1 SDK 入り。GitHub 上は preview）でビルドする。
+    # デプロイターゲットは iOS 26.0 のまま。27.1 限定の API は `#available(iOS 27.1, *)` で実行時に分ける。
     # テストターゲットはまだ無いのでシミュレータは起動せず、SDK 向けコンパイルだけ確認する。
     # シミュレータ不要の iOS Foundation 単体（Apps/BlueTicker 配下の SwiftPM パッケージ）は ios-packages が回す。
     # 署名はしない（CODE_SIGNING_ALLOWED=NO。プロジェクトの DEVELOPMENT_TEAM は実機用）。
     # 実行判定は changes（Apps/BlueTicker/ と ci.yml・Package.swift の変更時）。
     needs: changes
     if: needs.changes.outputs.ios == 'true'
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
