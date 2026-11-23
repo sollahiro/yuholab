@@ -45,8 +45,26 @@ struct RegularCompareView: View {
     private func left(group: BenchmarkGroup, metric: BenchmarkMetric) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Image(systemName: group.symbol)
-                Text(group.title).font(.headline)
+                Menu {
+                    ForEach(BenchmarkCatalog.groups) { item in
+                        Button {
+                            selectGroup(item)
+                        } label: {
+                            Label(item.title, systemImage: item.id == group.id ? "checkmark" : item.symbol)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: group.symbol)
+                        Text(group.title).font(.headline)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(Theme.textMuted)
+                    }
+                    .foregroundStyle(Theme.text)
+                }
+                .accessibilityLabel("業種を選ぶ")
+                .accessibilityValue(group.title)
                 Spacer(minLength: 0)
                 if case .loaded(let companies) = phase {
                     Text("\(companies.count)社")
@@ -117,6 +135,7 @@ struct RegularCompareView: View {
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(Theme.textMuted)
                     .frame(width: 18)
+                CompanyIconView(company.ref, size: 30)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(Format.displayName(company.name, fallback: company.code))
                         .font(.footnote.weight(.semibold))
@@ -154,6 +173,15 @@ struct RegularCompareView: View {
         .accessibilityLabel("\(company.name) \(metric.formatted(value))")
         .accessibilityValue(pinned ? "ピン留め中" : "")
         .accessibilityHint("ピン留めして右で並べて比べます")
+    }
+
+    /// 業種を切り替える。指標とピン留めは業種ごとに意味が変わるので選び直す。
+    private func selectGroup(_ item: BenchmarkGroup) {
+        guard item.id != model.compareGroup else { return }
+        model.compareGroup = item.id
+        model.compareMetric = item.metrics.first?.key ?? ""
+        model.pinned = []
+        phase = .loading
     }
 
     private func togglePin(_ code: String) {
@@ -209,9 +237,12 @@ struct RegularCompareView: View {
                     ForEach(pinned) { company in
                         if let value = company.kpis[metric.key]?.value {
                             VStack(alignment: .leading, spacing: 5) {
-                                Text(Format.displayName(company.name, fallback: company.code))
-                                    .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(Theme.text)
+                                HStack(spacing: 8) {
+                                    CompanyIconView(company.ref, size: 22)
+                                    Text(Format.displayName(company.name, fallback: company.code))
+                                        .font(.footnote.weight(.semibold))
+                                        .foregroundStyle(Theme.text)
+                                }
                                 HStack(spacing: 10) {
                                     GeometryReader { geo in
                                         Capsule()
@@ -248,11 +279,14 @@ struct RegularCompareView: View {
                 GridRow {
                     Text("")
                     ForEach(pinned) { company in
-                        Text(Format.displayName(company.name, fallback: company.code))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Theme.textMuted)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.trailing)
+                        VStack(alignment: .trailing, spacing: 4) {
+                            CompanyIconView(company.ref, size: 26)
+                            Text(Format.displayName(company.name, fallback: company.code))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Theme.textMuted)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.trailing)
+                        }
                     }
                 }
                 ForEach(group.metrics) { item in
@@ -263,7 +297,7 @@ struct RegularCompareView: View {
                             .foregroundStyle(Theme.textMuted)
                             .gridColumnAlignment(.leading)
                         let values = pinned.map { $0.kpis[item.key]?.value }
-                        let best = values.compactMap { $0 }.max { lhs, rhs in
+                        let best: Double? = pinned.count < 2 ? nil : values.compactMap { $0 }.max { lhs, rhs in
                             item.higherIsBetter ? lhs < rhs : lhs > rhs
                         }
                         ForEach(Array(pinned.enumerated()), id: \.element.id) { index, _ in
