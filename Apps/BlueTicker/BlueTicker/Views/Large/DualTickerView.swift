@@ -9,17 +9,31 @@ struct DualTickerView: View {
 
     @State private var pickingSide: LargeScreenModel.Side?
 
+    /// 操作中のペインの背景。枠ではなく、半分の画面の色で示す。
+    private static let focusedFill = Color(red: 0.07, green: 0.11, blue: 0.16)
+
     var body: some View {
         let pane = model.pane(tab)
-        HStack(spacing: 0) {
-            tickerPane(pane.company, side: .left, focused: pane.focus == .left)
-            Divider().overlay(Color.white.opacity(0.08))
-            tickerPane(pane.second, side: .right, focused: pane.focus == .right)
+        // 画面の安全領域（safeAreaInsets）に合わせる。端末の角丸や側面のレールで文字・アイコンが欠けないよう、
+        // 左右の端は安全領域の内側、かつ最低限の余白（角丸ぶん）を取る。背景は端まで広げる。
+        GeometryReader { proxy in
+            let leading = max(proxy.safeAreaInsets.leading, Self.minimumEdgeMargin)
+            HStack(spacing: 0) {
+                tickerPane(pane.company, side: .left, focused: pane.focus == .left, edgeMargin: leading)
+                Divider().overlay(Color.white.opacity(0.08))
+                tickerPane(pane.second, side: .right, focused: pane.focus == .right, edgeMargin: 0)
+            }
+            .ignoresSafeArea(edges: .leading)
         }
     }
 
+    /// 端末の角丸で文字・アイコンが欠けない最小の左余白。
+    private static let minimumEdgeMargin: CGFloat = 14
+
     @ViewBuilder
-    private func tickerPane(_ company: CompanyRef?, side: LargeScreenModel.Side, focused: Bool) -> some View {
+    private func tickerPane(
+        _ company: CompanyRef?, side: LargeScreenModel.Side, focused: Bool, edgeMargin: CGFloat
+    ) -> some View {
         Group {
             if let company, pickingSide != side {
                 RegularTickerPane(
@@ -27,30 +41,16 @@ struct DualTickerView: View {
                     // モード切替は左ペインだけに出す（選択中の「2つ表示」を押すと一覧＋詳細へ戻る）。
                     onSetMode: side == .left ? { mode in model.update(tab) { $0.mode = mode } } : nil,
                     onBack: nil,
-                    onSearch: { pickingSide = side })
+                    onSearch: { pickingSide = side },
+                    background: focused ? Self.focusedFill : Theme.shell)
                     .id(company.code)
             } else {
                 picker(side: side, hasCompany: company != nil)
             }
         }
         .frame(maxWidth: .infinity)
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Theme.accent.opacity(focused ? 0.45 : 0), lineWidth: 1.5)
-                .allowsHitTesting(false)
-        }
-        .overlay(alignment: .bottomLeading) {
-            if focused {
-                Text("操作中")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Color.black)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 2)
-                    .background(Theme.accent, in: Capsule())
-                    .padding(6)
-                    .allowsHitTesting(false)
-            }
-        }
+        .padding(.leading, edgeMargin)
+        .background(focused ? Self.focusedFill : Theme.shell)
         .contentShape(Rectangle())
         .simultaneousGesture(
             TapGesture().onEnded { model.update(tab) { $0.focus = side } }

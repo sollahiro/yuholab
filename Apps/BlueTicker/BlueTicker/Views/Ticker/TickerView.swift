@@ -6,6 +6,7 @@ import UIKit
 struct TickerView: View {
     var company: CompanyRef
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query private var watched: [WatchedCompany]
     @State private var resolvedSector = ""
     @State private var showsCompanyCard = false
@@ -18,9 +19,10 @@ struct TickerView: View {
     /// タイトル位置の社名ピルのウィンドウ座標。広がる始点に使う。
     @State private var pillRect: CGRect = .zero
     @State private var contentWidth: CGFloat = 0
+    @State private var overview: String?
 
     var body: some View {
-        AnalysisView(code: company.code)
+        AnalysisView(code: company.code, header: usesInlineHeader ? AnyView(inlineHeader) : nil)
             .overlay(alignment: .top) {
                 if let watchToast {
                     WatchToastView(toast: watchToast)
@@ -41,52 +43,56 @@ struct TickerView: View {
             // ピルとカードはバーより上の一つのガラス。ビュー内オーバーレイは
             // UIKit のバーより必ず下に合成されてかぶせられない。
             .overlay {
-                CompanyGlassPresenter(
-                    handedOff: $pillHandedOff,
-                    expanded: showsCompanyCard,
-                    pillRect: pillRect,
-                    company: displayCompany,
-                    onExpanded: { showsCompanyCard = $0 },
-                    onFittedPill: { pillRect = $0 },
-                    trailingButtonCount: 2
-                )
+                if !usesInlineHeader {
+                    CompanyGlassPresenter(
+                        handedOff: $pillHandedOff,
+                        expanded: showsCompanyCard,
+                        pillRect: pillRect,
+                        company: displayCompany,
+                        onExpanded: { showsCompanyCard = $0 },
+                        onFittedPill: { pillRect = $0 },
+                        trailingButtonCount: 2
+                    )
+                }
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
-                // タイトル領域に置くと、戻ると右上グループの残りをシステムが割り当てる。
-                // 右上の幅を固定予約すると機種によって足りず、「…」へ折りたたまれる。
-                ToolbarItem(placement: .title) {
-                    // 場所はタイトル位置のまま。見た目のガラスは窓上へ出す。
-                    // ここに glassEffect を付けると、ナビのタイトルとして横スライドする。
-                    if pillHandedOff {
-                        Color.clear
-                            .frame(width: max(pillRect.width, 1), height: max(pillRect.height, 1))
-                            .accessibilityElement(children: .ignore)
+                if !usesInlineHeader {
+                    // タイトル領域に置くと、戻ると右上グループの残りをシステムが割り当てる。
+                    // 右上の幅を固定予約すると機種によって足りず、「…」へ折りたたまれる。
+                    ToolbarItem(placement: .title) {
+                        // 場所はタイトル位置のまま。見た目のガラスは窓上へ出す。
+                        // ここに glassEffect を付けると、ナビのタイトルとして横スライドする。
+                        if pillHandedOff {
+                            Color.clear
+                                .frame(width: max(pillRect.width, 1), height: max(pillRect.height, 1))
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(Format.displayName(company.name, fallback: company.code))
+                                .accessibilityHint("銘柄コード・業種・Overview を表示します")
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityAction { showsCompanyCard = true }
+                                .accessibilityHidden(showsCompanyCard)
+                        } else {
+                            Button {
+                                showsCompanyCard = true
+                            } label: {
+                                // 内容幅まで縮める。上限は中央タイトルが戻る・右ボタンに被らない幅。
+                                CompanyPillLabel(company: company)
+                            }
+                            .buttonStyle(.plain)
+                            .fixedSize(horizontal: true, vertical: true)
+                            .frame(maxWidth: titlePillMaxWidth)
+                            .clipped()
+                            .opacity(0)
+                            .onGeometryChange(for: CGRect.self) { proxy in
+                                proxy.frame(in: .global)
+                            } action: { pillRect = $0 }
                             .accessibilityLabel(Format.displayName(company.name, fallback: company.code))
                             .accessibilityHint("銘柄コード・業種・Overview を表示します")
-                            .accessibilityAddTraits(.isButton)
-                            .accessibilityAction { showsCompanyCard = true }
-                            .accessibilityHidden(showsCompanyCard)
-                    } else {
-                        Button {
-                            showsCompanyCard = true
-                        } label: {
-                            // 内容幅まで縮める。上限は中央タイトルが戻る・右ボタンに被らない幅。
-                            CompanyPillLabel(company: company)
                         }
-                        .buttonStyle(.plain)
-                        .fixedSize(horizontal: true, vertical: true)
-                        .frame(maxWidth: titlePillMaxWidth)
-                        .clipped()
-                        .opacity(0)
-                        .onGeometryChange(for: CGRect.self) { proxy in
-                            proxy.frame(in: .global)
-                        } action: { pillRect = $0 }
-                        .accessibilityLabel(Format.displayName(company.name, fallback: company.code))
-                        .accessibilityHint("銘柄コード・業種・Overview を表示します")
                     }
                 }
                 ToolbarItemGroup(placement: .topBarTrailing) {
@@ -101,6 +107,30 @@ struct TickerView: View {
             }
             .background { InteractivePopGestureEnabler(allowsPop: !showsCompanyCard) }
             .task { await hydrateSector() }
+            .task(id: company.code) { if usesInlineHeader { await loadOverview() } }
+    }
+
+    /// 折りたたみ型の画面（Duo の外側・内側）では、社名ピルを使わず、見出しと Overview を本文の先頭に常に出す。
+    private var usesInlineHeader: Bool {
+        horizontalSizeClass == .regular || FoldableScreen.isFoldableShape
+    }
+
+    /// アイコン・社名・コード/業種の見出しと、Overview（最大 5 行）。分析カードの手前に常に出す。
+    private var inlineHeader: some View {
+        CompanyInlineHeader(company: displayCompany, overview: overview)
+    }
+
+    private func loadOverview() async {
+        func clean(_ text: String) -> String? {
+            let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value.isEmpty ? nil : value
+        }
+        if let cached = await APIClient.shared.cachedOverview(code: company.code) {
+            overview = clean(cached.overview)
+        }
+        if let loaded = try? await APIClient.shared.overview(code: company.code) {
+            overview = clean(loaded.overview)
+        }
     }
 
     private var matchingRows: [WatchedCompany] {
@@ -1818,5 +1848,56 @@ private extension UIView {
             responder = current.next
         }
         return nil
+    }
+}
+
+
+/// 折りたたみ型の画面かどうかの判定（1 か所）。機種名は見ず、画面全体の縦横比（幅 ÷ 高さ）で決める。
+/// Duo の外側は約 466×678pt（約 0.69）、通常の iPhone の縦向きは約 0.46〜0.49。
+/// 横向きの iPhone（約 2.1）は含めない。regular 幅（Duo の内側など）は呼び出し側で常に対象にする。
+enum FoldableScreen {
+    static let minimumAspect: CGFloat = 0.6
+    static let maximumAspect: CGFloat = 1.0
+
+    static func isFoldableShape(width: CGFloat, height: CGFloat) -> Bool {
+        guard height > 0 else { return false }
+        let aspect = width / height
+        return aspect >= minimumAspect && aspect <= maximumAspect
+    }
+
+    /// 現在の画面全体（Split View などの分割ではなく、画面そのもの）の形。
+    @MainActor
+    static var isFoldableShape: Bool {
+        let bounds = UIScreen.main.bounds
+        return isFoldableShape(width: bounds.width, height: bounds.height)
+    }
+}
+
+/// 銘柄画面の本文先頭の見出し。アイコン・社名・コード/業種と、Overview（最大 5 行）。
+struct CompanyInlineHeader: View {
+    var company: CompanyRef
+    var overview: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                CompanyIconView(company, size: 44)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(Format.displayName(company.name, fallback: company.code))
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(Theme.text)
+                        .lineLimit(2)
+                    Text(company.sector.isEmpty ? company.code : "\(company.code) · \(company.sector)")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textMuted)
+                }
+                Spacer(minLength: 0)
+            }
+            if let overview {
+                FillWidth { JustifiedOverviewText(text: overview) }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
     }
 }

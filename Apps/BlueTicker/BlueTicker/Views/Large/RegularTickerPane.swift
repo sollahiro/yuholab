@@ -14,6 +14,8 @@ struct RegularTickerPane: View {
     var onBack: (() -> Void)?
     /// 2 つ表示のペインで、銘柄を入れ替える検索。
     var onSearch: (() -> Void)?
+    /// ペインの背景。2 つ表示では、操作中のペインだけ色を変えて示す。
+    var background: Color = Theme.shell
 
     @Environment(\.modelContext) private var modelContext
     @Query private var watched: [WatchedCompany]
@@ -37,7 +39,7 @@ struct RegularTickerPane: View {
             AnalysisView(code: company.code, layout: effectiveLayout)
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
-        .background(Theme.shell)
+        .background(background)
         // 同じペインで銘柄だけが変わっても、読み込み直す。
         .task(id: company.code) {
             resolvedSector = ""

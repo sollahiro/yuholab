@@ -15,6 +15,8 @@ enum AnalysisLayout {
 struct AnalysisView: View {
     var code: String
     var layout: AnalysisLayout = .single
+    /// 本文の先頭に置く見出し（compact の銘柄画面）。
+    var header: AnyView? = nil
     @State private var response: FinancialsResponse?
     @State private var errorMessage: String?
     @State private var breakdown: BreakdownModel?
@@ -50,6 +52,7 @@ struct AnalysisView: View {
             switch layout {
             case .single:
                 VStack(spacing: Theme.cardContentInset) {
+                    if let header { header }
                     PerformanceSection(years: years, currency: currency)
                     BusinessProfitSection(years: years, currency: currency)
                     BreakdownSections(model: breakdown)
@@ -73,13 +76,30 @@ struct AnalysisView: View {
                 }
                 .padding(Theme.cardContentInset)
             case .waterfall:
-                HStack(alignment: .top, spacing: Theme.cardContentInset) {
-                    BusinessProfitSection(years: years, currency: currency)
+                // 収益構造のウォーターフォールを大きく出し、右に要因の式と意味。下に既存の項目をそのまま並べる。
+                VStack(spacing: Theme.cardContentInset) {
+                    HStack(alignment: .top, spacing: Theme.cardContentInset) {
+                        // 左: ウォーターフォールの下に業績を重ね、右の説明の高さに合わせる。
+                        VStack(spacing: Theme.cardContentInset) {
+                            BusinessProfitSection(years: years, currency: currency)
+                            PerformanceSection(years: years, currency: currency)
+                        }
                         .frame(maxWidth: .infinity)
-                    ProfitBridgeExplainer(embedded: true)
-                        .frame(width: 300)
-                        .padding(20)
-                        .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cardCornerRadius, style: .continuous))
+                        ProfitBridgeExplainer(embedded: true)
+                            .frame(width: 300)
+                            .padding(20)
+                            .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cardCornerRadius, style: .continuous))
+                    }
+                    HStack(alignment: .top, spacing: Theme.cardContentInset) {
+                        VStack(spacing: Theme.cardContentInset) {
+                            BreakdownSections(model: breakdown)
+                            ProductivitySection(years: years, currency: currency)
+                        }
+                        VStack(spacing: Theme.cardContentInset) {
+                            CapitalEfficiencySection(years: years)
+                            CashAllocationSection(years: years, currency: currency)
+                        }
+                    }
                 }
                 .padding(Theme.cardContentInset)
             }
