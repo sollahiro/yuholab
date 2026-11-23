@@ -30,6 +30,7 @@ struct RegularCompareView: View {
                 } secondary: {
                     right(group: group, metric: metric)
                 }
+                .standardTopInset()
             } else {
                 ContentUnavailableView("比較できる業種がありません", systemImage: "chart.bar")
             }

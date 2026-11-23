@@ -134,3 +134,22 @@ struct AdaptiveSplit<Primary: View, Secondary: View>: View {
         }
     }
 }
+
+
+/// 大画面の各画面の上端を、全画面モードの標準ツールバー画面（`NavigationStack`）と同じ高さにそろえる。
+/// 側面にコントロールがあるとき（Duo の横向きなど）、標準のバーがある画面は上に 24pt の safe area が付き、
+/// コンテンツの上端がステータスバーの時刻の高さに合う。項目の無い画面（ホーム・リスト・同業比較）は
+/// バー自体が無いので、この値を safe area として足す（空のバーや見えない項目では領域が付かない／別の項目が出るため）。
+/// 値は、全画面モードで `safeAreaInsets.top` を実測したもの（Duo 内側の横向き）。
+private struct StandardTopInset: ViewModifier {
+    static let statusLineInset: CGFloat = 24
+    @Environment(\.hasSideControls) private var hasSideControls
+
+    func body(content: Content) -> some View {
+        content.safeAreaPadding(.top, hasSideControls ? Self.statusLineInset : 0)
+    }
+}
+
+extension View {
+    func standardTopInset() -> some View { modifier(StandardTopInset()) }
+}

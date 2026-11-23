@@ -14,14 +14,16 @@ struct RegularHomeView: View {
             switch (pane.mode, pane.company) {
             case (.dual, .some):
                 DualTickerView(model: model, tab: 0, query: $query)
+                    .standardTopInset()
             case (.full, .some(let company)):
                 RegularTickerPane(
                     company: company, layout: .waterfall, mode: .full,
                     onSetMode: { mode in model.update(0) { $0.mode = mode } },
-                    onBack: { model.update(0) { $0.mode = .detail } })
+                    onBack: { model.update(0) { $0.mode = .detail } },
+                    usesSystemToolbar: true)
                     .id(company.code)
             default:
-                split(pane)
+                split(pane).standardTopInset()
             }
         }
         .background(Theme.shell.ignoresSafeArea())

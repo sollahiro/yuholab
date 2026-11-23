@@ -16,6 +16,9 @@ struct RegularTickerPane: View {
     var onSearch: (() -> Void)?
     /// ペインの背景。2 つ表示では、操作中のペインだけ色を変えて示す。
     var background: Color = Theme.shell
+    /// `true` なら、戻る・星・全画面/2つ切替・検索を標準のツールバー（`NavigationStack` + `ToolbarItemGroup`）に出し、
+    /// 見出しからは外す。バーの位置・優先順位はシステムに任せる（Duo では側面）。全画面モードだけが使う。
+    var usesSystemToolbar = false
 
     @Environment(\.modelContext) private var modelContext
     @Query private var watched: [WatchedCompany]
@@ -24,6 +27,14 @@ struct RegularTickerPane: View {
     @State private var width: CGFloat = 0
 
     var body: some View {
+        if usesSystemToolbar {
+            NavigationStack { content.modifier(SystemToolbar(pane: self)) }
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: 0) {
             header
             if let overview {
@@ -56,7 +67,7 @@ struct RegularTickerPane: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            if let onBack {
+            if let onBack, !usesSystemToolbar {
                 Button(action: onBack) {
                     Image(systemName: "chevron.left")
                         .font(.body.weight(.semibold))
@@ -79,14 +90,16 @@ struct RegularTickerPane: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
-            if let onSearch {
-                iconButton("magnifyingglass", label: "銘柄を入れ替える", action: onSearch)
+            if !usesSystemToolbar {
+                if let onSearch {
+                    iconButton("magnifyingglass", label: "銘柄を入れ替える", action: onSearch)
+                }
+                if let onSetMode {
+                    modeSwitch(onSetMode)
+                }
+                iconButton(isWatched ? "bookmark.fill" : "bookmark",
+                    label: isWatched ? "リストから削除" : "リストに追加", action: toggleWatch)
             }
-            if let onSetMode {
-                modeSwitch(onSetMode)
-            }
-            iconButton(isWatched ? "bookmark.fill" : "bookmark",
-                label: isWatched ? "リストから削除" : "リストに追加", action: toggleWatch)
         }
         .padding(.horizontal, 14)
         .padding(.top, 8)
@@ -147,9 +160,9 @@ struct RegularTickerPane: View {
     }
 
     private var matchingRows: [WatchedCompany] { watched.filter { $0.code == company.code } }
-    private var isWatched: Bool { !matchingRows.isEmpty }
+    fileprivate var isWatched: Bool { !matchingRows.isEmpty }
 
-    private func toggleWatch() {
+    fileprivate func toggleWatch() {
         let matching = matchingRows
         if matching.isEmpty {
             modelContext.insert(
@@ -186,5 +199,42 @@ struct RegularTickerPane: View {
         if let loaded = try? await APIClient.shared.overview(code: company.code) {
             overview = clean(loaded.overview)
         }
+    }
+}
+
+
+/// 全画面の銘柄ペインの標準ツールバー。項目は `Label`（タイトル+シンボル）で、グループにまとめる。
+/// 位置・間隔・はみ出しはシステムに任せる。
+private struct SystemToolbar: ViewModifier {
+    var pane: RegularTickerPane
+
+    func body(content: Content) -> some View {
+        content
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                if let onBack = pane.onBack {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("戻る", systemImage: "chevron.left", action: onBack)
+                    }
+                }
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    if let onSetMode = pane.onSetMode {
+                        Button("全画面で見る", systemImage: "arrow.up.left.and.arrow.down.right") {
+                            onSetMode(pane.mode == .full ? .detail : .full)
+                        }
+                        .accessibilityAddTraits(pane.mode == .full ? .isSelected : [])
+                        Button("2 銘柄を並べる", systemImage: "rectangle.split.2x1") {
+                            onSetMode(.dual)
+                        }
+                    }
+                    Button(
+                        pane.isWatched ? "リストから削除" : "リストに追加",
+                        systemImage: pane.isWatched ? "bookmark.fill" : "bookmark",
+                        action: pane.toggleWatch)
+                }
+            }
     }
 }
