@@ -513,6 +513,20 @@ private struct PerformanceSection: View {
         return ChartMath.niceTicks(lower: values.min() ?? 0, upper: values.max() ?? 0)
     }
 
+    /// 左軸の罫線。純利益がマイナスの年があるとき、0 より下にも同じ間隔で点線を引く。
+    private var leftGridTicks: [Double] {
+        var ticks = salesTicks
+        guard ticks.count >= 2, domain.lowerBound < 0 else { return ticks }
+        let step = ticks[1] - ticks[0]
+        guard step > 0 else { return ticks }
+        var value = (ticks.min() ?? 0) - step
+        while value >= domain.lowerBound {
+            ticks.append(value)
+            value -= step
+        }
+        return ticks
+    }
+
     private var netTicks: [Double] {
         let values = netValues.compactMap { $0 }
         return ChartMath.niceTicks(lower: values.min() ?? 0, upper: values.max() ?? 0)
@@ -584,11 +598,12 @@ private struct PerformanceSection: View {
             }
         }
         .chartYAxis {
-            AxisMarks(position: .leading, values: salesTicks) { value in
+            AxisMarks(position: .leading, values: leftGridTicks) { value in
                 AxisGridLine(stroke: ChartStyle.grid)
                     .foregroundStyle(ChartStyle.gridColor)
                 AxisValueLabel {
-                    if let number = value.as(Double.self) {
+                    // マイナス側の罫線には、売上高の目盛りの文字を出さない（売上高にマイナスはないため）。
+                    if let number = value.as(Double.self), number >= (salesTicks.min() ?? 0) {
                         Text(salesScale.map { Format.scaledYen(number, scale: $0) } ?? Format.autoYen(number))
                             .font(.caption2)
                             .foregroundStyle(Theme.textMuted)

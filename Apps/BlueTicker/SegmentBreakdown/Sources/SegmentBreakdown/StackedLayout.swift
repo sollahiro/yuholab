@@ -303,14 +303,38 @@ enum StackedLayout {
                     let source = bars[k - 1].filter { group.fromKeys.contains($0.key) }
                     let target = bars[k].filter { group.toKeys.contains($0.key) }
                     guard let first = source.first, let second = target.first else { continue }
-                    ribbons.append(
-                        BreakdownRibbon(
-                            fromColumn: k - 1, key: "group|\(k)|\(index)", colorIndex: -1,
-                            leftTop: source.map(\.y).min() ?? first.y,
-                            leftBottom: source.map { $0.y + $0.height }.max() ?? first.y + first.height,
-                            rightTop: target.map(\.y).min() ?? second.y,
-                            rightBottom: target.map { $0.y + $0.height }.max() ?? second.y + second.height,
-                            leftX: first.x + first.width, rightX: second.x))
+                    let leftTop = source.map(\.y).min() ?? first.y
+                    let leftBottom = source.map { $0.y + $0.height }.max() ?? first.y + first.height
+                    let rightTop = target.map(\.y).min() ?? second.y
+                    let rightBottom = target.map { $0.y + $0.height }.max() ?? second.y + second.height
+                    // 塊のつなぎは、旧区分の色（再編先の色にそろえてある）で帯を切り分け、
+                    // 左右の高さの比で対応づける。色が前の年から後の年へ途切れずに続く。
+                    let orderedSource = source.sorted { $0.y < $1.y }
+                    let orderedTarget = target.sorted { $0.y < $1.y }
+                    // 上から数えた各棒の下端の位置（0〜1）。
+                    func edges(_ bars: [BreakdownBar], top: Double, bottom: Double) -> [Double] {
+                        let span = bottom - top
+                        guard span > 0 else { return [1] }
+                        return bars.map { min(max(($0.y + $0.height - top) / span, 0), 1) }
+                    }
+                    let sourceEdges = edges(orderedSource, top: leftTop, bottom: leftBottom)
+                    var cuts = Set([0.0, 1.0])
+                    cuts.formUnion(sourceEdges)
+                    cuts.formUnion(edges(orderedTarget, top: rightTop, bottom: rightBottom))
+                    let sortedCuts = cuts.sorted()
+                    for (slice, pair) in zip(sortedCuts, sortedCuts.dropFirst()).enumerated() where pair.1 - pair.0 > 1e-9 {
+                        let mid = (pair.0 + pair.1) / 2
+                        let barIndex = sourceEdges.firstIndex { mid <= $0 } ?? max(orderedSource.count - 1, 0)
+                        let color = orderedSource[min(barIndex, orderedSource.count - 1)].colorIndex
+                        ribbons.append(
+                            BreakdownRibbon(
+                                fromColumn: k - 1, key: "group|\(k)|\(index)|\(slice)", colorIndex: color,
+                                leftTop: leftTop + (leftBottom - leftTop) * pair.0,
+                                leftBottom: leftTop + (leftBottom - leftTop) * pair.1,
+                                rightTop: rightTop + (rightBottom - rightTop) * pair.0,
+                                rightBottom: rightTop + (rightBottom - rightTop) * pair.1,
+                                leftX: first.x + first.width, rightX: second.x))
+                    }
                 }
             }
         }
