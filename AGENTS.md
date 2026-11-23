@@ -4,7 +4,7 @@
 - 外向きの製品名（API・MCP・ドキュメント・フィード）は「有報LAB」。英字は `YuhoLAB`、slug・ホスト名など小文字の識別子は `yuholab`（`yuho-lab` にしない）。`blt` / `BLT`（`blt-server`・`blt-ingest`・`BLT_*`・`blt_reader`）は **Business Line Terminal**＝内部の抽出・解析ロジックの略なので、旧ブランドの残りとして消さない・改名しない。「Blue Ticker」「ブルーティッカー」は旧名で新たに書かない。`blue-ticker` と綴った識別子（リポジトリ・Swift モジュール・R2 等）の扱いは `docs/decisions/yuholab-rebrand.md` に従う。
 - 本番 write は `BLT_NEON_WRITE_DATABASE_URL` の明示指定時だけ行う。RO への書き込みと本番 schema の削除は禁止。
 - Linux / 新しい Swift では、CI・Dockerfile と同じ `-Xswiftc -disable-upcoming-feature -Xswiftc MemberImportVisibility` を build / test に付ける。
-- iOS（`Apps/BlueTicker`）の型検査・ビルドは CI の `ios` ジョブ（`macos-26`）で行う。TestFlight / Archive は Xcode Cloud（配布専用。マージ品質ゲートにしない）。詳細は `docs/ios-client.md`。
+- iOS（`Apps/BlueTicker`）の型検査・ビルドは CI の `ios` ジョブ（`xcode-27`。iOS 27.1 SDK 限定 API を使うため）で行う。TestFlight / Archive は Xcode Cloud（配布専用。マージ品質ゲートにしない）。詳細は `docs/ios-client.md`。
 - 新機能・XBRL・本番 ingest・release・tracker・デプロイは対応する `.agents/skills/` に従う。取り込み運用の Git 正本は `.agents/skills/production-ingest/SKILL.md` のみ（固定の起動スクリプトは置かない）。会社アイコンの品質基準は `.agents/skills/company-icon-quality/SKILL.md`（R2 手置き。fetch / ingest パイプラインは無い）。
 - 外部 API・CLI・DB schema・設定・公開契約の変更と、本番 write / 公開範囲の拡張はユーザー確認なしに行わない。
 - 製品面は REST・iOS・公開 MCP コネクタ（HAPIS）。コネクタに出すツールと引数の範囲は `hapis/catalog.json` が正本（`hapis/README.md`、`docs/public-api.md`）。
