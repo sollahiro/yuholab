@@ -59,6 +59,7 @@ struct AnalysisView: View {
                     CapitalEfficiencySection(years: years)
                     CashAllocationSection(years: years, currency: currency)
                     ProductivitySection(years: years, currency: currency)
+                    RelationsCard(code: code)
                 }
                 .padding(Theme.cardContentInset)
             case .twoColumn:
@@ -67,6 +68,7 @@ struct AnalysisView: View {
                         PerformanceSection(years: years, currency: currency)
                         BreakdownSections(model: breakdown)
                         ProductivitySection(years: years, currency: currency)
+                        RelationsCard(code: code)
                     }
                     VStack(spacing: Theme.cardContentInset) {
                         BusinessProfitSection(years: years, currency: currency)
@@ -138,6 +140,7 @@ struct AnalysisView: View {
                                 return sales / Double(employees)
                             },
                         ])
+                    RelationsCard(code: code)
                 }
                 .padding(Theme.cardContentInset)
             }

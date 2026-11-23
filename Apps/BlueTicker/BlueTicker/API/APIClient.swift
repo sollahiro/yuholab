@@ -116,6 +116,13 @@ actor APIClient {
         return try await get(url, cacheTTL: ttl(for: code))
     }
 
+    /// 関係（`type` は `supplier` / `investee` / `subsidiary` / `major_shareholder`）。公開できる行が無いと 404。
+    func relations(code: String, type: String, limit: Int) async throws -> CompanyRelationsResponse {
+        let url = try queryURL(
+            "v1/companies/\(code)/relations", [("type", type), ("limit", String(limit))])
+        return try await get(url, cacheTTL: ttl(for: code))
+    }
+
     private func queryURL(_ suffix: String, _ items: [(String, String)]) throws -> URL {
         var components = URLComponents(url: path(suffix), resolvingAgainstBaseURL: false)
         components?.queryItems = items.map { URLQueryItem(name: $0.0, value: $0.1) }

@@ -39,6 +39,7 @@
 		AA0000000000000000000081 /* StackedLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000081 /* StackedLayout.swift */; };
 		AA0000000000000000000082 /* BreakdownBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000082 /* BreakdownBuilder.swift */; };
 		AA0000000000000000000083 /* BreakdownCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000083 /* BreakdownCards.swift */; };
+		AA0000000000000000000089 /* RelationsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000089 /* RelationsCard.swift */; };
 		AA0000000000000000000040 /* FeedRSS.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000040 /* FeedRSS.swift */; };
 		AA0000000000000000000041 /* FeedRSSStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000041 /* FeedRSSStore.swift */; };
 		AA0000000000000000000088 /* BenchmarkStaticStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000088 /* BenchmarkStaticStore.swift */; };
@@ -95,6 +96,7 @@
 		BB0000000000000000000081 /* StackedLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackedLayout.swift; sourceTree = "<group>"; };
 		BB0000000000000000000082 /* BreakdownBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreakdownBuilder.swift; sourceTree = "<group>"; };
 		BB0000000000000000000083 /* BreakdownCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreakdownCards.swift; sourceTree = "<group>"; };
+		BB0000000000000000000089 /* RelationsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelationsCard.swift; sourceTree = "<group>"; };
 		BB0000000000000000000040 /* FeedRSS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedRSS.swift; sourceTree = "<group>"; };
 		BB0000000000000000000041 /* FeedRSSStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedRSSStore.swift; sourceTree = "<group>"; };
 		BB0000000000000000000088 /* BenchmarkStaticStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchmarkStaticStore.swift; sourceTree = "<group>"; };
@@ -223,6 +225,7 @@
 				BB0000000000000000000017 /* OverviewText.swift */,
 				BB0000000000000000000018 /* AnalysisView.swift */,
 				BB0000000000000000000083 /* BreakdownCards.swift */,
+				BB0000000000000000000089 /* RelationsCard.swift */,
 			);
 			path = Ticker;
 			sourceTree = "<group>";
@@ -386,6 +389,7 @@
 				AA0000000000000000000081 /* StackedLayout.swift in Sources */,
 				AA0000000000000000000082 /* BreakdownBuilder.swift in Sources */,
 				AA0000000000000000000083 /* BreakdownCards.swift in Sources */,
+				AA0000000000000000000089 /* RelationsCard.swift in Sources */,
 				AA0000000000000000000087 /* BenchmarkRankingView.swift in Sources */,
 				AA0000000000000000000086 /* CompareView.swift in Sources */,
 				AA0000000000000000000085 /* BenchmarkCatalog.swift in Sources */,

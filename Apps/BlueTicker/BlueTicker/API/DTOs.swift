@@ -159,6 +159,54 @@ struct CompanyOverviewResponse: Codable {
     }
 }
 
+/// `GET /v1/companies/{code}/relations`。画面が読むキーだけ持つ（公開 JSON の手書き）。
+struct CompanyRelationsResponse: Codable {
+    var code: String
+    var relations: [CompanyRelationItem]
+}
+
+struct CompanyRelationItem: Codable, Hashable {
+    /// `customer` / `supplier` / `group` / `investee` / `major_shareholder` / `major_shareholder_of`。
+    var type: String
+    /// 上場企業に名寄せできたときだけ値がある。
+    var company: RelationCompany?
+    var nameRaw: String
+    /// 円。仕入先（相手の売上のうち自社向け）。
+    var amountYen: Double?
+    /// 子会社への議決権比率（%）。
+    var votingRatio: Double?
+    var investee: RelationInvestee?
+    var majorShareholder: RelationMajorShareholder?
+
+    enum CodingKeys: String, CodingKey {
+        case type, company, investee
+        case nameRaw = "name_raw"
+        case amountYen = "amount_yen"
+        case votingRatio = "voting_ratio"
+        case majorShareholder = "major_shareholder"
+    }
+}
+
+struct RelationCompany: Codable, Hashable {
+    var code: String
+    var name: String
+}
+
+struct RelationInvestee: Codable, Hashable {
+    /// 円。
+    var bookValueYen: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case bookValueYen = "book_value_yen"
+    }
+}
+
+struct RelationMajorShareholder: Codable, Hashable {
+    var rank: Int?
+    /// 割合（0.128 = 12.8%）。
+    var ratio: Double?
+}
+
 struct APIErrorBody: Codable {
     var error: String?
     var status: Int?
