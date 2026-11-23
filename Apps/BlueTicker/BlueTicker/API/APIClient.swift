@@ -108,15 +108,21 @@ actor APIClient {
         return notFoundReasons[url.absoluteString]
     }
 
-    /// 最新の地域別内訳が 404 のとき、開示の省略を表す理由（`domestic_dominant_90pct` / `no_overseas_sales`）。
-    /// 省略以外の欠測（`not_found` / `unknown` など）や取得失敗は nil（理由が言えないのでカードを出さない）。
-    func geographyOmissionReason(code: String) async -> String? {
-        guard (try? await breakdown(code: code, axis: "geography")) == nil,
-            let url = try? queryURL("v1/companies/\(code)/breakdown", [("axis", "geography")]),
-            let reason = notFoundReasons[url.absoluteString],
-            reason == "domestic_dominant_90pct" || reason == "no_overseas_sales"
-        else { return nil }
-        return reason
+    /// 最新の地域別内訳が 404 のときの理由。省略は `domestic_dominant_90pct` / `no_overseas_sales`、
+    /// それ以外の 404（未算出・不明）は `unavailable`。取得失敗（通信エラーなど）は nil。
+    func geographyMissingReason(code: String) async -> String? {
+        do {
+            _ = try await breakdown(code: code, axis: "geography")
+            return nil
+        } catch APIClientError.http(let status, _) where status == 404 {
+            guard let url = try? queryURL("v1/companies/\(code)/breakdown", [("axis", "geography")]),
+                let reason = notFoundReasons[url.absoluteString],
+                reason == "domestic_dominant_90pct" || reason == "no_overseas_sales"
+            else { return "unavailable" }
+            return reason
+        } catch {
+            return nil
+        }
     }
 
     /// 内訳（`axis` は `segment` / `geography`）。`docId` を省くと最新の有報。

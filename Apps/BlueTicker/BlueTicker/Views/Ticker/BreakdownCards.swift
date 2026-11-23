@@ -43,8 +43,10 @@ struct BreakdownModel {
     var region: RegionCardModel?
     /// 単一セグメントの会社（セグメントの内訳が無い）。カードに「単一セグメント」と出す。
     var singleSegment = false
-    /// 地域ごとの情報を有報が省略している会社の理由（内訳 API の 404 reason）。カードに省略の旨を出す。
+    /// 地域のカードが組めない会社の理由（内訳 API の 404 reason。省略以外は `unavailable`）。カードに省略・未取得の旨を出す。
     var regionOmission: String?
+    /// 地域がセグメントそのもの（セグメントカードで足りる）ので、地域カードは出さない。
+    var regionIsSegment = false
 
     /// 直近 5 年（取れる分だけ）。
     static let years = 5
@@ -57,9 +59,9 @@ struct BreakdownModel {
             latest = model
             update(model)
         }
-        // 地域のカードが組めなかった会社のうち、有報が地域を省略している旨を返すものは、その理由のカードを出す。
-        guard latest.region == nil,
-            let reason = await APIClient.shared.geographyOmissionReason(code: code)
+        // 地域のカードが組めなかった会社は、省略の理由、または未取得の旨のカードを出す。
+        guard latest.region == nil, !latest.regionIsSegment,
+            let reason = await APIClient.shared.geographyMissingReason(code: code)
         else { return }
         latest.regionOmission = reason
         await update(latest)
@@ -121,7 +123,9 @@ struct BreakdownModel {
                 region = regionModel(waterfall: waterfall, responses: responses)
             }
         }
-        await update(BreakdownModel(segment: segment, region: region))
+        var final = BreakdownModel(segment: segment, region: region)
+        final.regionIsSegment = geographic
+        await update(final)
     }
 
     /// 内訳 API が単一セグメントと返す理由。
@@ -196,6 +200,8 @@ private struct RegionOmittedCard: View {
 
     private var note: String {
         switch reason {
+        case "unavailable":
+            return "地域別売上高は未取得です。"
         case "domestic_dominant_90pct":
             return "本邦の外部顧客への売上高が連結売上高の90%を超えるため、有価証券報告書では地域ごとの売上高を開示していません。"
         default:
@@ -205,7 +211,7 @@ private struct RegionOmittedCard: View {
 
     var body: some View {
         AnalysisCard(title: "地域別売上高") {
-            Text("地域別の開示なし")
+            Text(reason == "unavailable" ? "未取得" : "地域別の開示なし")
                 .font(.headline)
                 .foregroundStyle(Theme.text)
             AnalysisNote(text: note)
