@@ -62,6 +62,12 @@ struct TickerView: View {
             .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
+                if usesInlineHeader {
+                    // 見出し（アイコン・社名・コード/業種）は標準のナビバーの中央（.principal）へ。長い社名は末尾を省略する。
+                    ToolbarItem(placement: .principal) {
+                        CompanyBarTitle(company: displayCompany)
+                    }
+                }
                 if !usesInlineHeader {
                     // タイトル領域に置くと、戻ると右上グループの残りをシステムが割り当てる。
                     // 右上の幅を固定予約すると機種によって足りず、「…」へ折りたたまれる。
@@ -121,7 +127,7 @@ struct TickerView: View {
 
     /// アイコン・社名・コード/業種の見出しと、Overview（最大 5 行）。分析カードの手前に常に出す。
     private var inlineHeader: some View {
-        CompanyInlineHeader(company: displayCompany, overview: overview)
+        CompanyInlineHeader(overview: overview)
     }
 
     private func loadOverview() async {
@@ -1856,31 +1862,39 @@ private extension UIView {
 }
 
 
-/// 銘柄画面の本文先頭の見出し。アイコン・社名・コード/業種と、Overview（最大 5 行）。
-struct CompanyInlineHeader: View {
+/// ナビバーの中央に置く銘柄の見出し。アイコン・社名・コード/業種。幅が足りなければ社名の末尾を省略する。
+struct CompanyBarTitle: View {
     var company: CompanyRef
+
+    var body: some View {
+        HStack(spacing: 8) {
+            CompanyIconView(company, size: 28)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(Format.displayName(company.name, fallback: company.code))
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Theme.text)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text(company.sector.isEmpty ? company.code : "\(company.code) · \(company.sector)")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.textMuted)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// 銘柄画面の本文先頭の Overview（最大 5 行）。見出しはナビバーの中央に置く。
+struct CompanyInlineHeader: View {
     var overview: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                CompanyIconView(company, size: 44)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(Format.displayName(company.name, fallback: company.code))
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(Theme.text)
-                        .lineLimit(2)
-                    Text(company.sector.isEmpty ? company.code : "\(company.code) · \(company.sector)")
-                        .font(.caption)
-                        .foregroundStyle(Theme.textMuted)
-                }
-                Spacer(minLength: 0)
-            }
-            if let overview {
-                FillWidth { JustifiedOverviewText(text: overview) }
-            }
+        if let overview {
+            FillWidth { JustifiedOverviewText(text: overview) }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 4)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 4)
     }
 }

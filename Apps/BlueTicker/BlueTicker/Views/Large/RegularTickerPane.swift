@@ -40,7 +40,8 @@ struct RegularTickerPane: View {
 
     private var content: some View {
         VStack(spacing: 0) {
-            header
+            // 標準ツールバーのとき、見出しはナビバーの中央（.principal）に出す。ここには Overview だけ。
+            if !usesSystemToolbar { header }
             if let overview {
                 Text(overview)
                     .font(.footnote)
@@ -156,7 +157,7 @@ struct RegularTickerPane: View {
         return sector.isEmpty ? company.code : "\(company.code) · \(sector)"
     }
 
-    private var displayCompany: CompanyRef {
+    fileprivate var displayCompany: CompanyRef {
         CompanyRef(
             code: company.code, name: company.name,
             sector: company.sector.isEmpty ? resolvedSector : company.sector,
@@ -219,6 +220,9 @@ private struct SystemToolbar: ViewModifier {
             .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    CompanyBarTitle(company: pane.displayCompany)
+                }
                 if let onBack = pane.onBack {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("戻る", systemImage: "chevron.left", action: onBack)
