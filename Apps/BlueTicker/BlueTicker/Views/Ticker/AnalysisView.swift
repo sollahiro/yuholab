@@ -116,7 +116,18 @@ struct AnalysisView: View {
                             b.amountRow("財務CF") { $0.cff },
                             b.amountRow("現金の増減") { $0.cfCashChange },
                             b.amountRow("ネットキャッシュ") { $0.netCash },
-                        ])
+                        ],
+                        tableExtra: {
+                            // 借入・配当・自己株式取得の推移は、表の側（右）に置く。
+                            if years.contains(where: { $0.cfDebtChange != nil || $0.cfDividendsParent != nil || $0.cfBuyback != nil }) {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("借入・配当・自己株式取得の推移")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(Theme.text)
+                                    FinancingTrendChart(years: years, currency: currency)
+                                }
+                            }
+                        })
                     b.mergedCard(
                         ProductivitySection(years: years, currency: currency),
                         rows: [
@@ -160,12 +171,18 @@ private struct FullCardBuilder {
     var currency: String?
 
     /// 全画面の 1 枚。左にグラフ（既存のカード）、右に数値の表を、1 枚のカードにまとめる。
-    func mergedCard<Chart: View>(_ chart: Chart, rows: [NumberTableCard.Row]) -> some View {
-        HStack(alignment: .top, spacing: 28) {
+    func mergedCard<Chart: View, Extra: View>(
+        _ chart: Chart, rows: [NumberTableCard.Row], @ViewBuilder tableExtra: () -> Extra = { EmptyView() }
+    ) -> some View {
+        let extra = tableExtra()
+        return HStack(alignment: .top, spacing: 28) {
             chart
                 .frame(maxWidth: .infinity)
-            NumberTableCard(years: years, rows: rows)
-                .frame(maxWidth: .infinity)
+            VStack(alignment: .leading, spacing: 20) {
+                NumberTableCard(years: years, rows: rows)
+                extra
+            }
+            .frame(maxWidth: .infinity)
         }
         .environment(\.analysisCardChrome, false)
         .environment(\.analysisWide, true)
@@ -1477,7 +1494,6 @@ private struct CashAllocationSection: View {
     var years: [FinancialsYear]
     var currency: String?
     @State private var selectedYearID: String?
-    @Environment(\.analysisWide) private var wide
 
     var body: some View {
         AnalysisCard(title: "資金配分") {
@@ -1490,10 +1506,6 @@ private struct CashAllocationSection: View {
                 ])
             } else {
                 AnalysisNote(text: "ネットキャッシュ・フリーCFは未集計です。")
-            }
-            if wide, years.contains(where: { $0.cfDebtChange != nil || $0.cfDividendsParent != nil || $0.cfBuyback != nil }) {
-                AnalysisSubheading(text: "借入・配当・自己株式取得の推移")
-                FinancingTrendChart(years: years, currency: currency)
             }
             AnalysisSubheading(text: "フリーCFの使い道")
             if selectableYears.isEmpty {
