@@ -253,13 +253,15 @@ private struct NumberTableCard: View {
                                 .font(.caption)
                                 .foregroundStyle(Theme.textMuted)
                                 .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
                             if !row.unit.isEmpty {
                                 Text(row.unit)
                                     .font(.caption2)
                                     .foregroundStyle(Theme.idleTab)
                             }
                         }
-                        .frame(width: 84, alignment: .leading)
+                        .frame(width: 100, alignment: .leading)
                         .gridColumnAlignment(.leading)
                         ForEach(years) { year in
                             Text(row.value(year))
