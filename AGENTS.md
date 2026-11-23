@@ -18,4 +18,4 @@
 - カバレッジは financials と statements を分けて書く（`docs/process/coverage-reporting.md`）。
 - 有報と公開面の突合手順は `docs/process/yuho-harm-check.md`。実害の記録先はオーナー管理のトラッカー Sheet（`docs/process/tracker-placement.md`）。
 - Neon の子ブランチは使わない（`docs/process/neon-branches.md`、`.env.example`）。検証はローカル Postgres。
-- 生きている進捗・件数は Git に書かず、オーナー管理のトラッカー Sheet の「現在地」を見る（`docs/status/README.md`）。課題の置き場所は `docs/process/tracker-placement.md`。
+- 生きている進捗・件数は Git に書かず、オーナー管理のトラッカー Sheet の「現在地」を見る（URL と課題の置き場所は `docs/process/tracker-placement.md`）。
