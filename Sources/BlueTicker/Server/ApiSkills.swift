@@ -165,7 +165,7 @@ public func apiSkillsCatalog() -> [ApiSkill] {
                     location: .query,
                     type: .string,
                     description:
-                        "カンマ区切り: customer,supplier,group,parent,subsidiary,investee,major_shareholder,major_shareholder_of（省略時は全種類。group は親会社と子会社。関連会社は返さない）",
+                        "カンマ区切り: customer,supplier,group,parent,subsidiary,investee,investee_of,major_shareholder,major_shareholder_of（省略時は全種類。investee_of は他社の政策保有株式に自社の株式が載っている会社＝被保有。group は親会社と子会社。関連会社は返さない）",
                     required: false
                 ),
                 ApiSkillParameter(
@@ -186,7 +186,7 @@ public func apiSkillsCatalog() -> [ApiSkill] {
             instructions: """
                 有報の記載だけを返す（basis は常に disclosed。推定・競合は出さない）。
                 company は上場企業に名寄せできたときだけ付く（それ以外は null で name_raw のみ）。
-                supplier / major_shareholder_of は相手側の有報からの逆引きで、上場企業どうしだけ。
+                supplier / investee_of / major_shareholder_of は相手側の有報からの逆引きで、上場企業どうしだけ。
                 omitted は提出会社が記載を省略した type。未知の type・不正なコードは 400、未格納は 404、DB 非接続は 503。
                 例: GET /v1/companies/9409/relations?type=customer,group
                 """

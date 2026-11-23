@@ -307,9 +307,16 @@ private func relations(_ json: [String: Any]?) -> [[String: Any]] {
             #expect(investee?["book_value_yen"] as? Double == 5_000_000)
             #expect(investee?["is_deemed"] as? Bool == false)
             #expect(investee?["holder"] as? String == relationHolderReportingCompany)
-            // 出資先の逆引きはしない。
-            let (status, _) = try await send(app, "/v1/companies/6902/relations")
-            #expect(status == .notFound)
+            // 逆引き（被保有）。他社の政策保有株式に自社が載っている会社を `investee_of` で返す。
+            let (status, reverse) = try await send(app, "/v1/companies/6902/relations?type=investee_of")
+            #expect(status == .ok)
+            let held = try #require(relations(reverse).first)
+            #expect(held["type"] as? String == "investee_of")
+            #expect((held["company"] as? [String: Any])?["code"] as? String == "7203")
+            #expect((held["investee"] as? [String: Any])?["book_value_yen"] as? Double == 5_000_000)
+            // 出資先（自社が持つ側）の応答には混ざらない。
+            let (_, own) = try await send(app, "/v1/companies/6902/relations?type=investee")
+            #expect(relations(own).isEmpty)
         }
     }
 

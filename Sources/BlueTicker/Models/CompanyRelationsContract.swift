@@ -222,7 +222,8 @@ public struct EdinetFilerName: Sendable, Equatable {
 // MARK: - 公開 REST（GET /v1/companies/{code}/relations）
 
 /// `type` クエリの値。`group` は parent + subsidiary + affiliate + other_related のまとめ。
-/// `supplier` / `major_shareholder_of` は他社の有報からの逆引き（上場企業どうしだけ）。
+/// `supplier` / `investee_of` / `major_shareholder_of` は他社の有報からの逆引き（上場企業どうしだけ）。
+/// `investee_of` は他社の政策保有株式（出資先）の欄に自社の株式が載っている会社（被保有）。
 public enum CompanyRelationQueryType: String, CaseIterable, Sendable {
     case customer
     case supplier
@@ -231,6 +232,7 @@ public enum CompanyRelationQueryType: String, CaseIterable, Sendable {
     case subsidiary
     case affiliate
     case investee
+    case investeeOf = "investee_of"
     case majorShareholder = "major_shareholder"
     case majorShareholderOf = "major_shareholder_of"
 }
@@ -240,6 +242,7 @@ public let relationTypeCustomer = "customer"
 public let relationTypeSupplier = "supplier"
 public let relationTypeGroup = "group"
 public let relationTypeInvestee = "investee"
+public let relationTypeInvesteeOf = "investee_of"
 public let relationTypeMajorShareholder = "major_shareholder"
 public let relationTypeMajorShareholderOf = "major_shareholder_of"
 
