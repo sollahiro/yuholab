@@ -1,6 +1,6 @@
 // 関係の公開 REST（`GET /v1/companies/{code}/relations`）の読み取り。company_relations の格納行だけを返す。
 // 自社の有報の行（顧客・関係会社・出資先・大株主）と、他社の有報からの逆引き（仕入先・親会社・大株主になっている会社）。
-// 逆引きは上場企業どうしだけ（`related_code` が付いた行）。出資先（investee）の逆引きはしない。
+// 逆引きは上場企業どうしだけ（`related_code` が付いた行）。出資先（investee）の逆引きは `investee_of`（被保有）として返す。
 // 公開可否は `isPubliclyServableRelation`。`needs_review` は応答に載せない。住所も載せない。
 
 import BltStoreCore
@@ -125,7 +125,7 @@ func serveStoredRelations(
     }
 }
 
-/// 自社の行と逆引きの行を読む。逆引きは他社の行のうち `related_code = code` の顧客・子会社・親会社・大株主。
+/// 自社の行と逆引きの行を読む。逆引きは他社の行のうち `related_code = code` の顧客・子会社・親会社・大株主・出資先。
 func loadRelationRows(code: String, db: Database) async throws -> (own: [RelationServeRow], reverse: [RelationServeRow]) {
     let own = try await CompanyRelation.query(on: db)
         .filter(\.$code == code)
@@ -146,6 +146,7 @@ func loadRelationRows(code: String, db: Database) async throws -> (own: [Relatio
 /// 逆引きに使う相手側の `kind`。
 let reverseRelationKinds = [
     relationKindCustomer, relationKindSubsidiary, relationKindParent, relationKindMajorShareholder,
+    relationKindInvestee,
 ]
 
 /// 応答に出す上場企業コード → 社名（マスタ）。
@@ -228,6 +229,21 @@ func buildCompanyRelationsResponse(
                         isDeemed: row.isDeemed ?? false, holder: row.holder),
                     evidence: evidence(row)))
         }
+    }
+    if types.contains(.investeeOf) {
+        // 他社の政策保有株式の欄に自社の株式が載っている会社。相手側が持つ簿価の大きい順。
+        let holders = servableReverse.filter { $0.kind == relationKindInvestee }
+            .sorted { ($0.bookValueYen ?? -1, $1.code) > ($1.bookValueYen ?? -1, $0.code) }
+        items.append(
+            contentsOf: mergedByCounterparty(holders, reasons: reverseReasons) { row, reasons in
+                CompanyRelationItem(
+                    type: relationTypeInvesteeOf, kind: relationTypeInvesteeOf, company: ref(row.code),
+                    nameRaw: companyName(row.code) ?? row.code, reasons: reasons,
+                    investee: CompanyRelationInvestee(
+                        shares: row.shares, bookValueYen: row.bookValueYen, purpose: row.purpose,
+                        isDeemed: row.isDeemed ?? false, holder: row.holder),
+                    evidence: evidence(row))
+            })
     }
     if types.contains(.majorShareholder) {
         let holders = servableOwn.filter { $0.kind == relationKindMajorShareholder }

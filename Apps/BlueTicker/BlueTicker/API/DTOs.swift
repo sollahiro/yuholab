@@ -173,8 +173,6 @@ struct CompanyRelationItem: Codable, Hashable {
     var nameRaw: String
     /// 円。仕入先（相手の売上のうち自社向け）。
     var amountYen: Double?
-    /// 子会社への議決権比率（%）。
-    var votingRatio: Double?
     var investee: RelationInvestee?
     var majorShareholder: RelationMajorShareholder?
 
@@ -182,7 +180,6 @@ struct CompanyRelationItem: Codable, Hashable {
         case type, company, investee
         case nameRaw = "name_raw"
         case amountYen = "amount_yen"
-        case votingRatio = "voting_ratio"
         case majorShareholder = "major_shareholder"
     }
 }
