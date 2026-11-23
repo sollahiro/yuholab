@@ -114,6 +114,9 @@ enum SideControls {
 /// 左右の端だけに足す（ペイン間は足さない）。通常の iPhone（compact）には使わない。
 enum LargeMetrics {
     static let paneEdge: CGFloat = 8
+    /// 左の一覧ペイン（検索・リスト・ランキング）の背景。右のコンテンツ（`Theme.shell`）より一段明るくして区別する。
+    /// 既存のトークン `Theme.control` を使う（新しい色は足さない）。2 つ表示の「操作中」の青み（`DualTickerView`）とは別。
+    static let listPaneFill = Theme.control
 }
 
 /// 一覧（プライマリ）と詳細（セカンダリ）の 2 ペイン。iOS 27.1 以降は標準の `ArrangementView`（`.split`）で、
@@ -129,13 +132,19 @@ struct AdaptiveSplit<Primary: View, Secondary: View>: View {
         if #available(iOS 27.1, *) {
             // 分割比は、プライマリ側のビューに付けて伝える（ArrangementView 自体ではなく）。
             ArrangementView(
-                primary: { primary.splitArrangementLayoutRatio(ratio).safeAreaPadding(.leading, LargeMetrics.paneEdge) },
+                primary: {
+                    primary.splitArrangementLayoutRatio(ratio)
+                        .safeAreaPadding(.leading, LargeMetrics.paneEdge)
+                        .background(LargeMetrics.listPaneFill.ignoresSafeArea())
+                },
                 secondary: { secondary.safeAreaPadding(.trailing, LargeMetrics.paneEdge) }
             )
             .arrangementViewStyle(.split)
         } else {
             HStack(spacing: 0) {
-                primary.safeAreaPadding(.leading, LargeMetrics.paneEdge).frame(width: fallbackWidth)
+                primary.safeAreaPadding(.leading, LargeMetrics.paneEdge)
+                    .frame(width: fallbackWidth)
+                    .background(LargeMetrics.listPaneFill.ignoresSafeArea())
                 Divider().overlay(Color.white.opacity(0.08))
                 secondary.safeAreaPadding(.trailing, LargeMetrics.paneEdge).frame(maxWidth: .infinity)
             }

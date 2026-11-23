@@ -145,7 +145,7 @@ struct RegularCompareView: View {
                             .fill(Color.white.opacity(0.08))
                             .overlay(alignment: .leading) {
                                 Capsule()
-                                    .fill(metric.band.color(for: value))
+                                    .fill(Theme.accent)
                                     .frame(width: max(5, geo.size.width * min(abs(value) / maxValue, 1)))
                             }
                     }
@@ -245,7 +245,7 @@ struct RegularCompareView: View {
                                 HStack(spacing: 10) {
                                     GeometryReader { geo in
                                         Capsule()
-                                            .fill(metric.band.color(for: value))
+                                            .fill(Theme.accent)
                                             .frame(width: max(6, geo.size.width * min(abs(value) / maxValue, 1)))
                                     }
                                     .frame(height: 14)
