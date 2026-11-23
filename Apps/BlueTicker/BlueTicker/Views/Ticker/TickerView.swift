@@ -1852,17 +1852,16 @@ private extension UIView {
 }
 
 
-/// 折りたたみ型の画面かどうかの判定（1 か所）。機種名は見ず、画面全体の縦横比（幅 ÷ 高さ）で決める。
-/// Duo の外側は約 466×678pt（約 0.69）、通常の iPhone の縦向きは約 0.46〜0.49。
-/// 横向きの iPhone（約 2.1）は含めない。regular 幅（Duo の内側など）は呼び出し側で常に対象にする。
+/// 折りたたみ型の画面かどうかの判定（1 か所）。機種名は見ず、画面全体の縦横比で決める。
+/// 向き（縦・横）で変わらないよう、短辺 ÷ 長辺を使う。Duo の外側は約 466×678pt（約 0.69。横向きでも同じ）、
+/// 通常の iPhone は約 0.46〜0.49（横向きでも同じ）。regular 幅（Duo の内側など）は呼び出し側で常に対象にする。
 enum FoldableScreen {
     static let minimumAspect: CGFloat = 0.6
-    static let maximumAspect: CGFloat = 1.0
 
     static func isFoldableShape(width: CGFloat, height: CGFloat) -> Bool {
-        guard height > 0 else { return false }
-        let aspect = width / height
-        return aspect >= minimumAspect && aspect <= maximumAspect
+        let longer = max(width, height)
+        guard longer > 0 else { return false }
+        return min(width, height) / longer >= minimumAspect
     }
 
     /// 現在の画面全体（Split View などの分割ではなく、画面そのもの）の形。
