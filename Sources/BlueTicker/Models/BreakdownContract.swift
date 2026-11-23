@@ -649,10 +649,10 @@ public func isPubliclyServableBreakdown(
 
 /// 格納行が read 可能か。version-gated な source は cache_version が当該軸の床以上のときのみ。
 /// パース不能な cache_version は非 servable（誤った clean LLM 行を古い版のまま出し続けない）。
-/// `axis` 省略時は product_service（現行 REST/MCP 公開軸）。公開面の `needs_review` /
+/// 公開面の `needs_review` /
 /// `llm_unit_unresolved` 除外は `isPubliclyServableBreakdown`（この関数は ingest 床専用）。
 public func isServableBreakdown(
-    source: String, cacheVersion: String, axis: String = breakdownAxisProductService
+    source: String, cacheVersion: String, axis: String
 ) -> Bool {
     guard isVersionGatedBreakdownSource(source) else { return true }
     guard let n = breakdownCacheVersionNumber(cacheVersion) else { return false }
