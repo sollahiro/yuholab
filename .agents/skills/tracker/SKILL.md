@@ -20,5 +20,5 @@ description: 次の作業選定、コード欠陥、PR、ingest進捗、公開�
 ## 更新
 
 - 仕様・Contract・ジョブ編成は Git、変動する進捗・件数・ゲートはオーナー管理のトラッカー Sheet に置く。
-- 本番 ingest の件数は `workers/status-rss` の RSS（`feed.sollahiro.com/blue-ticker/ingest-status.xml`）か、各テーブルの `cache_version` 別の件数で都度見る。Issue コメントや日付付き snapshot を増やさない。
+- 本番 ingest の件数は各テーブルの `cache_version` 別の件数で都度見る。Issue コメントや日付付き snapshot を増やさない。
 - コード欠陥と運用進捗を同じ tracker に重複登録しない。

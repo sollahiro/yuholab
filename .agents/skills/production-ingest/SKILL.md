@@ -123,7 +123,7 @@ stage 系統ごとにプロセスを分け、1 プロセスに `--stages` を詰
 
 - 各 `blt-ingest` が exit 0。失敗した job より後を「成功」と数えない。
 - ログに WRITE 接続の明示がある（本番 write のとき）。READ URL のまま書いていない。
-- 取り込み状況は `workers/status-rss` の RSS（`https://feed.sollahiro.com/blue-ticker/ingest-status.xml`）。最終更新が 36 時間より古いステージは題に「遅延」。件数の Git 固定はしない。
+- 取り込み状況は各テーブルの `cache_version` 別の件数と最終更新で見る（取り込み状況 RSS は廃止）。件数の Git 固定はしない。
 - マイグレーション後は `/healthz` の `cache_versions` がイメージとずれていないこと。
 
 ## 異常時対応
