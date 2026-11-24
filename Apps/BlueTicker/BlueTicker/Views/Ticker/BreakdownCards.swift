@@ -70,11 +70,14 @@ struct BreakdownModel {
     private static func loadCards(code: String, update: @MainActor (BreakdownModel) -> Void) async {
         // 利益（最新期）は積み上げの取得を待たずに始める。
         async let detail = try? APIClient.shared.breakdown(code: code, axis: "segment")
+        // 直近の有報の地域別が 404（省略・未取得）なら、古い年の地域カードは出さない（`load` が理由のカードを出す）。
+        async let latestGeographyMissing = APIClient.shared.geographyMissingReason(code: code)
         guard let waterfall = try? await APIClient.shared.segmentWaterfall(code: code, years: years) else {
             // 内訳が「単一セグメントのため省略」と返る会社は、その旨のカードを出す。
             _ = await detail
             if await APIClient.shared.segmentNotFoundReason(code: code) == singleSegmentReason {
-                await loadSingleSegment(code: code, update: update)
+                await loadSingleSegment(
+                    code: code, latestGeographyMissing: await latestGeographyMissing, update: update)
             }
             return
         }
@@ -84,7 +87,8 @@ struct BreakdownModel {
         // 区分が 1 つだけでは構成も推移も見えない。
         guard let latest = columns.last else { return }
         guard latest.items.count >= 2 else {
-            await loadSingleSegment(code: code, update: update)
+            await loadSingleSegment(
+                code: code, latestGeographyMissing: await latestGeographyMissing, update: update)
             return
         }
         let layout = StackedLayout.make(columns: columns)
@@ -112,7 +116,9 @@ struct BreakdownModel {
         // 3 段目: 地域。
         let geographic = detailRows.contains { $0.segmentBasis == "geographic" }
         var region: RegionCardModel?
-        if !geographic {
+        if !geographic, await latestGeographyMissing != nil {
+            // 直近の有報が省略・未取得: 古い年の実データを最新のように見せない。
+        } else if !geographic {
             if let response = await regionWaterfall,
                 let model = regionModel(
                     columns: BreakdownBuilder.geographyColumns(response) { Format.fy($0.fyEnd) })
@@ -132,8 +138,12 @@ struct BreakdownModel {
     private static let singleSegmentReason = "single_segment_disclosed"
 
     /// 単一セグメントの会社: 「単一セグメント」のカードを出し、地域は取れれば続けて出す。
-    private static func loadSingleSegment(code: String, update: @MainActor (BreakdownModel) -> Void) async {
+    private static func loadSingleSegment(
+        code: String, latestGeographyMissing: String?, update: @MainActor (BreakdownModel) -> Void
+    ) async {
         await update(BreakdownModel(segment: nil, region: nil, singleSegment: true))
+        // 直近の有報の地域別が省略・未取得なら、古い年の地域カードは出さない。
+        guard latestGeographyMissing == nil else { return }
         if let response = try? await APIClient.shared.geographyWaterfall(code: code, years: years),
             let region = regionModel(columns: BreakdownBuilder.geographyColumns(response) { Format.fy($0.fyEnd) })
         {
