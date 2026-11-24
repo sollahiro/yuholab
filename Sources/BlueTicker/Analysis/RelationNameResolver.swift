@@ -35,6 +35,10 @@ public enum RelationNameNormalizer {
             s = replacing(s, [trailingGroupPhrasePattern, englishCorporateSuffixPattern], with: "")
             s = trimmed(s)
         }
+        // 語尾の略称（「りそなＨＤ」「岡三証券G」）は正式な語にそろえる。EDINET 側の名前にも同じ規則を当てるので、
+        // 正式名と一致する相手だけが結ばれる（社名ごとの対応は持たない）。
+        s = replacing(s, [trailingHoldingsAbbreviationPattern], with: "ホールディングス")
+        s = replacing(s, [trailingGroupAbbreviationPattern], with: "グループ")
         s = replacing(s, [separatorPattern], with: "")
         return s
     }
@@ -91,6 +95,14 @@ public enum RelationNameNormalizer {
     /// （「㈱みずほフィナンシャルグル－プ」）。
     private static let katakanaLongVowelHyphenPattern = try! NSRegularExpression(
         pattern: #"(?<=[ァ-ヶ])[-‐‑–—―−]"#)
+
+    /// 語尾の「HD」（NFKC・大文字後）。
+    private static let trailingHoldingsAbbreviationPattern = try! NSRegularExpression(
+        pattern: #"(?<=\S)\s*HD\s*$"#)
+
+    /// 日本語の社名に続く語尾の「G」（英字の語の末尾は対象にしない）。
+    private static let trailingGroupAbbreviationPattern = try! NSRegularExpression(
+        pattern: #"(?<=[ぁ-ヿ一-鿿])\s*G\s*$"#)
 
     /// 空白・中点・句読点・ハイフン類（長音「ー」は残す）。
     private static let separatorPattern = try! NSRegularExpression(

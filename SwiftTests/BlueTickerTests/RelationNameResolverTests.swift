@@ -39,7 +39,16 @@ private func resolve(
         #expect(RelationNameNormalizer.normalize("リゾートトラスト　㈱*") == "リゾートトラスト")
         #expect(RelationNameNormalizer.normalize("シャープ㈱(※１)") == "シャープ")
         #expect(RelationNameNormalizer.normalize("株式会社ゼネラル※注４") == "ゼネラル")
-        #expect(RelationNameNormalizer.normalize("スギＨＤ㈱　※") == "スギHD")
+        #expect(RelationNameNormalizer.normalize("スギＨＤ㈱　※") == "スギホールディングス")
+    }
+
+    @Test func trailingAbbreviationsAreExpanded() {
+        #expect(RelationNameNormalizer.normalize("㈱りそなＨＤ") == "りそなホールディングス")
+        #expect(RelationNameNormalizer.normalize("ＡＮＡ　ＨＤ㈱　※")
+            == RelationNameNormalizer.normalize("ＡＮＡホールディングス株式会社"))
+        #expect(RelationNameNormalizer.normalize("㈱岡三証券G") == "岡三証券グループ")
+        // 英字の語の末尾の G は対象にしない。
+        #expect(RelationNameNormalizer.normalize("ＴＩＧ㈱") == "TIG")
     }
 
     @Test func hyphenAfterKatakanaIsLongVowel() {
