@@ -33,6 +33,15 @@ private func resolve(
         #expect(RelationNameNormalizer.normalize("Largan Precision Co.,Ltd.") == "LARGANPRECISION")
     }
 
+    @Test func hyphenAfterKatakanaIsLongVowel() {
+        // 有報の「－」（U+FF0D）表記の長音。EDINET 提出者名の「ー」と同じ照合用名になる。
+        #expect(RelationNameNormalizer.normalize("㈱みずほフィナンシャルグル－プ") == "みずほフィナンシャルグループ")
+        #expect(RelationNameNormalizer.normalize("㈱三菱ＵＦＪフィナンシャル・グル－プ")
+            == RelationNameNormalizer.normalize("株式会社三菱UFJフィナンシャル・グループ"))
+        // カタカナに続かないハイフンは従来どおり区切りとして消す。
+        #expect(RelationNameNormalizer.normalize("A-B CORP.") == "AB")
+    }
+
     @Test func listedFilerNameResolvesExactly() async {
         let dir = await directory()
         let result = resolve("株式会社大真空", ownCode: "6384", directory: dir)
