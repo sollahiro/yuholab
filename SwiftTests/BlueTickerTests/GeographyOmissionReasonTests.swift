@@ -2,6 +2,7 @@
 // 文言は有報の関連情報「地域ごとの情報」の定型文。
 
 import Foundation
+import SwiftSoup
 import Testing
 
 @testable import BlueTickerCore
@@ -151,5 +152,37 @@ import Testing
         // 本邦90%超の省略文（same_as ではない）
         #expect(sameAs(["２．地域ごとの情報(１）売上高本邦の外部顧客への売上高が連結損益計算書の売上高の90％を超えるため、記載を省略しております。"]) == nil)
         #expect(sameAs([]) == nil)
+    }
+
+    // MARK: 前の表の脚注が、後続の売上表（当期）を資産表として落とさない
+
+    /// source: code=6754 アンリツ doc_id=S100YH5E 地域別に関する情報（前期表・脚注・当期表の並び）
+    @Test func footnoteBetweenTablesDoesNotMakeNextTableAnAssetTable() throws {
+        let html = """
+            <div>
+            <p>(4) 地域別に関する情報</p>
+            <p>売上収益及び非流動資産（金融商品、繰延税金資産及び退職給付に係る資産を除く）の地域別内訳は以下のとおりです。</p>
+            <p>前連結会計年度（自　2024年４月１日　至　2025年３月31日）</p>
+            <table><tr><td>日本</td><td>36,378</td></tr></table>
+            <p>（注4）米国及び中国における非流動資産（金融商品、繰延税金資産及び退職給付に係る資産を除く）につきましては、重要性が乏しいため、記載を省略しております。</p>
+            <p>当連結会計年度（自　2025年４月１日　至　2026年３月31日）</p>
+            <table><tr><td>日本</td><td>39,885</td></tr></table>
+            </div>
+            """
+        let doc = try SwiftSoup.parse(html)
+        let tables = try doc.select("table").array()
+        #expect(tables.count == 2)
+        for table in tables {
+            let caption = try #require(BreakdownExtractor.nearestGeographyMetricCaption(before: table))
+            #expect(!BreakdownExtractor.isGeographyAssetMetricCaption(caption))
+        }
+    }
+
+    @Test func numberedFootnoteLineDetection() {
+        #expect(BreakdownExtractor.isNumberedFootnoteLine("（注4）米国及び中国における非流動資産"))
+        #expect(BreakdownExtractor.isNumberedFootnoteLine("(注１)連結子会社"))
+        #expect(BreakdownExtractor.isNumberedFootnoteLine("（注）１．調整額"))
+        #expect(!BreakdownExtractor.isNumberedFootnoteLine("所在地別の非流動資産（注4）"))
+        #expect(!BreakdownExtractor.isNumberedFootnoteLine("売上収益及び非流動資産の地域別内訳"))
     }
 }

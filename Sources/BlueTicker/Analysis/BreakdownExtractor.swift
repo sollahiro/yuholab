@@ -2832,7 +2832,9 @@ enum BreakdownExtractor {
     /// 単純な any-match だと売上表まで落とす（S100W4MT）。
     /// `precedingShortCaptions` は文書順（末尾＝直近）なので末尾から探索する。
     static func nearestGeographyMetricCaption(before table: Element) -> String? {
-        let captions = precedingShortCaptions(before: table)
+        // 前の表の脚注「（注4）米国及び中国における非流動資産…記載を省略しております」は、表の指標を示す
+        // キャプションではない。拾うと後続の売上表（当期）が資産表として丸ごと落ちる（アンリツ S100YH5E）。
+        let captions = precedingShortCaptions(before: table).filter { !isNumberedFootnoteLine($0) }
         for text in captions.reversed() {
             if isGeographyAssetMetricCaption(text) { return text }
             if text.contains("売上") || text.contains("収益") || text.contains("外部顧客") {
@@ -2840,6 +2842,11 @@ enum BreakdownExtractor {
             }
         }
         return captions.last
+    }
+
+    /// 「（注4）…」「(注１)…」のように注番号つきで始まる脚注行。
+    static func isNumberedFootnoteLine(_ text: String) -> Bool {
+        text.range(of: #"^[（(]注[0-9０-９]*[）)]"#, options: .regularExpression) != nil
     }
 
     static func isGeographyAssetMetricCaption(_ text: String) -> Bool {
