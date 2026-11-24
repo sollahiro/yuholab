@@ -106,6 +106,8 @@ let singleSegmentKey = "single|total"
 enum StackedLayout {
     static let barWidthRatio = 0.6
     static let headroom = 0.12
+    /// 系列の色の数（`BreakdownPalette` の色数と同じ）。1 列に最大 9 区分の会社がある。
+    static let paletteSize = 12
 
     static func make(columns: [BreakdownColumnInput]) -> BreakdownLayout {
         let n = columns.count
@@ -188,9 +190,14 @@ enum StackedLayout {
                 palette += 1
             }
         }
-        var colorIndex = position
-        // 再編元（旧区分）は、行き先（新区分）の色にそろえる。新しい年から順に決めて、再編が続いても最新の色になる。
+        // 再編元（旧区分）は、行き先（新区分）の色にそろえる（同じ色の組）。再編が続けば最新の色にそろう。
         // 旧と新の組は大きい順に対応づけ、旧が多いときは最後の新区分に寄せる。
+        var colorParent: [String: String] = Dictionary(uniqueKeysWithValues: ordered.map { ($0.id, $0.id) })
+        func colorRoot(_ id: String) -> String {
+            var root = id
+            while let next = colorParent[root], next != root { root = next }
+            return root
+        }
         for k in stride(from: n - 1, through: 1, by: -1) {
             for group in columns[k].groups {
                 func ids(_ keys: [String], _ column: Int) -> [String] {
@@ -205,9 +212,33 @@ enum StackedLayout {
                 let to = ids(group.toKeys, k).sorted { value($0, k) > value($1, k) }
                 guard !to.isEmpty else { continue }
                 for (index, id) in from.enumerated() where position[id] != -1 {
-                    colorIndex[id] = colorIndex[to[min(index, to.count - 1)]] ?? colorIndex[id]
+                    let target = colorRoot(to[min(index, to.count - 1)])
+                    let source = colorRoot(id)
+                    if source != target { colorParent[source] = target }
                 }
             }
+        }
+        // 色の組どうしが同じ列に並ぶときは別の色にする（系列が多い会社でパレットを一周して、同じ棒の中や凡例で色がかぶらないように）。
+        var coexisting: [String: Set<String>] = [:]
+        for k in 0..<n {
+            let roots = Set(items[k].map { colorRoot(seriesIDs[k][$0.key] ?? $0.key) })
+            for root in roots { coexisting[root, default: []].formUnion(roots.subtracting([root])) }
+        }
+        var rootColor: [String: Int] = [:]
+        var colorUse = Array(repeating: 0, count: paletteSize)
+        for seen in ordered where seen.id != singleSegmentKey {
+            let root = colorRoot(seen.id)
+            guard rootColor[root] == nil else { continue }
+            let taken = Set((coexisting[root] ?? []).compactMap { rootColor[$0] })
+            // 空きがあれば最小の番号、無ければ（1 列に paletteSize より多いとき）使用が少ない色。
+            let free = (0..<paletteSize).first { !taken.contains($0) }
+                ?? (0..<paletteSize).min { colorUse[$0] < colorUse[$1] } ?? 0
+            rootColor[root] = free
+            colorUse[free] += 1
+        }
+        var colorIndex: [String: Int] = [:]
+        for seen in ordered {
+            colorIndex[seen.id] = seen.id == singleSegmentKey ? -1 : (rootColor[colorRoot(seen.id)] ?? 0)
         }
         let series = ordered.map {
             BreakdownSeries(id: $0.id, label: $0.label, colorIndex: colorIndex[$0.id] ?? 0)
@@ -252,19 +283,43 @@ enum StackedLayout {
         }
 
         // 5. 棒と、つなぎ。
-        var bars: [[BreakdownBar]] = []
-        for k in 0..<n {
-            var cumulative = 0.0
-            var column: [BreakdownBar] = []
-            var sorted = items[k].sorted {
-                let a = position[seriesIDs[k][$0.key] ?? $0.key] ?? 0
-                let b = position[seriesIDs[k][$1.key] ?? $1.key] ?? 0
-                return a < b
+        // 積み上げ順は、最新の列を系列の並びで決め、古い列へは「つながり先の位置」を引き継ぐ。
+        // 系列の並びだけで決めると、再編で分かれた行き先（例: GEM → エナジー・モビリティ）が旧区分と別の位置に積まれ、帯が交差する。
+        // つながり先が無い行（終了）は、これまでどおり上に積む。
+        var stacked: [[BreakdownItemInput]] = Array(repeating: [], count: n)
+        for k in stride(from: n - 1, through: 0, by: -1) {
+            var slot: [String: Double] = [:]
+            for item in items[k] {
+                let id = seriesIDs[k][item.key] ?? item.key
+                let own = Double(position[id] ?? 0)
+                guard k + 1 < n else { slot[item.key] = own; continue }
+                let next = stacked[k + 1]
+                var targets: [Int] = []
+                for (index, candidate) in next.enumerated() {
+                    if case .connect(let from) = candidate.link, from == item.key { targets.append(index) }
+                }
+                for group in columns[k + 1].groups where group.fromKeys.contains(item.key) {
+                    for (index, candidate) in next.enumerated() where group.toKeys.contains(candidate.key) {
+                        targets.append(index)
+                    }
+                }
+                // 前年と結べない（break）行も、同じキーの行が次の列にあれば、その位置に積む。
+                if targets.isEmpty, let same = next.firstIndex(where: { $0.key == item.key }) { targets.append(same) }
+                // 位置の差が付くよう、つながり先の位置を整数、同じ先の中の並びを小数で足す。
+                slot[item.key] = targets.min().map { Double($0) + own / 1000 } ?? Double(next.count) + own / 1000
             }
+            var sorted = items[k].sorted { (slot[$0.key] ?? 0, $0.key) < (slot[$1.key] ?? 0, $1.key) }
             // 再編の組は、旧区分どうし・新区分どうしを隣り合わせに積む。
             var clusters = columns[k].groups.map(\.toKeys)
             if k + 1 < n { clusters += columns[k + 1].groups.map(\.fromKeys) }
             sorted = clustered(sorted, clusters: clusters)
+            stacked[k] = sorted
+        }
+        var bars: [[BreakdownBar]] = []
+        for k in 0..<n {
+            var cumulative = 0.0
+            var column: [BreakdownBar] = []
+            let sorted = stacked[k]
             for item in sorted {
                 let height = item.value * scale
                 cumulative += height
