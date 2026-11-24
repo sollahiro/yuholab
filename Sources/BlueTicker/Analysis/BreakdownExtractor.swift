@@ -877,6 +877,41 @@ enum BreakdownExtractor {
         return markers.contains(where: s.contains)
     }
 
+    private static let geographyInfoHeaderPattern = try! NSRegularExpression(
+        pattern: "地域(ごと|別|に関する)(の|に関する)?情報")
+    private static let geographySameAsReferencePattern = try! NSRegularExpression(
+        pattern: "(セグメント情報|報告セグメント|セグメント表)[^。]{0,80}?(同様|同一|同じ|記載|開示|参照)")
+
+    /// 関連情報「地域ごとの情報（1）売上高」が、売上の数字を持たずセグメント情報への参照だけで済ませている文。
+    /// 「セグメント情報に同様の情報を開示しているため、記載を省略している」（旭化学・積水化学）、
+    /// 「報告セグメントを地域別のセグメントとしているため、セグメント情報を参照」（白銅）、
+    /// 「報告セグメントごとの売上高…に記載の通り」（イトーキ）。Jev に頼らず same_as: segment と決める。
+    /// 見出し「地域ごとの情報」と参照句の間に売上の語があり、有形固定資産・主要顧客・製品の語が無い文だけを拾う
+    /// （「(2) 有形固定資産」だけがセグメント情報と同様、という文や、のれん注記の同様文は拾わない）。
+    static func geographySameAsSegmentStatement(in sentences: [String]) -> String? {
+        for sentence in sentences {
+            let s = sentence.replacingOccurrences(of: " ", with: "")
+                .replacingOccurrences(of: "　", with: "")
+            if s.contains("のれん") || s.contains("減損") { continue }
+            let range = NSRange(s.startIndex..., in: s)
+            guard let header = geographyInfoHeaderPattern.firstMatch(in: s, range: range),
+                let headerEnd = Range(header.range, in: s)?.upperBound
+            else { continue }
+            let tail = String(s[headerEnd...])
+            let tailRange = NSRange(tail.startIndex..., in: tail)
+            guard let reference = geographySameAsReferencePattern.firstMatch(in: tail, range: tailRange),
+                let referenceStart = Range(reference.range, in: tail)?.lowerBound
+            else { continue }
+            let between = tail[..<referenceStart]
+            guard between.contains("売上") else { continue }
+            if ["有形固定資産", "非流動資産", "顧客", "製品"].contains(where: { between.contains($0) }) {
+                continue
+            }
+            return sentence.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return nil
+    }
+
     /// 本邦90%超・海外売上なしの決定論省略は、Jev の same_as より先に採用する
     /// （6577: のれん注記の「セグメント情報に同様」を地域省略と誤認しない）。
     static func geographyOmissionTakesPriority(overSameAs reason: String) -> Bool {

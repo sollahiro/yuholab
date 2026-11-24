@@ -1423,6 +1423,13 @@ extension BltServerContext {
         {
             return .deterministic(.singleSegment, evidence: statement)
         }
+        // 地域ごとの情報（売上）がセグメント情報への参照だけの書類は、決定論で same_as にする。
+        if axis == .geography,
+            let statement = BreakdownExtractor.geographySameAsSegmentStatement(
+                in: BreakdownExtractor.segmentNoteSentences(xbrlDir: xbrlDir))
+        {
+            return .deterministic(.omittedSameAsSegment, evidence: statement)
+        }
         return await SegmentNotePatternClassifier.classify(
             axis: axis,
             signals: SegmentNotePatternSignals(

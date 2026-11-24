@@ -112,4 +112,44 @@ import Testing
         let joined = BreakdownExtractor.omissionSentenceSources(in: html).joined()
         #expect(!joined.contains("90％"))
     }
+
+    // MARK: 地域ごとの情報（売上）がセグメント情報への参照だけの書類 → same_as: segment
+
+    private func sameAs(_ sentences: [String]) -> String? {
+        BreakdownExtractor.geographySameAsSegmentStatement(in: sentences)
+    }
+
+    /// source: code=7928 旭化学工業 doc_id=S100ZJE8 page=58 field=geography
+    @Test func sameAsSegmentStatementOmittedBySameInformation() {
+        let sentence = "２．地域ごとの情報(１）売上高セグメント情報に同様の情報を開示しているため、記載を省略しております。"
+        #expect(sameAs([sentence]) == sentence)
+        // 積水化学 4204 S100YBAY の文言（「いる」止まり、空白あり）
+        #expect(sameAs(["２．地域ごとの情報 (１）売上高 セグメント情報に同様の情報を開示しているため、記載を省略している。"]) != nil)
+    }
+
+    /// source: code=7637 白銅 doc_id=S100YI9D page=90 field=geography（報告セグメントが地域別）
+    @Test func sameAsSegmentStatementWhenReportableSegmentsAreRegions() {
+        let sentence =
+            "２．地域ごとの情報（１）売上高当社グループは報告セグメントを地域別のセグメントとしていることから、地域ごとの売上高については、「セグメント情報　３．報告セグメントごとの売上高、利益又は損失、資産、負債その他の項目の金額に関する情報」をご参照下さい。"
+        #expect(sameAs([sentence]) == sentence)
+    }
+
+    /// source: code=7972 イトーキ doc_id=S100XRIU page=97 field=geography（記載の通り）
+    @Test func sameAsSegmentStatementWhenPointedToSegmentTable() {
+        let sentence =
+            "２．地域ごとの情報(1) 売上高「３．報告セグメントごとの売上高、利益又は損失、資産、負債その他の項目の金額に関する情報及び収益の分解情報」に記載の通りです。"
+        #expect(sameAs([sentence]) != nil)
+    }
+
+    @Test func sameAsSegmentStatementIgnoresOtherSentences() {
+        // 有形固定資産だけがセグメント情報と同様
+        #expect(sameAs(["２．地域ごとの情報(１）売上高(２）有形固定資産セグメント情報に同様の情報を開示しているため、記載を省略している。"]) == nil)
+        // 製品及びサービスごとの情報（地域の見出しが無い）
+        #expect(sameAs(["１．製品及びサービスごとの情報セグメント情報に同様の情報を開示しているため、記載を省略している。"]) == nil)
+        // のれん注記の同様文
+        #expect(sameAs(["（注）のれん償却額に関しては、セグメント情報に同様の情報を開示しているため、記載を省略しております。"]) == nil)
+        // 本邦90%超の省略文（same_as ではない）
+        #expect(sameAs(["２．地域ごとの情報(１）売上高本邦の外部顧客への売上高が連結損益計算書の売上高の90％を超えるため、記載を省略しております。"]) == nil)
+        #expect(sameAs([]) == nil)
+    }
 }
