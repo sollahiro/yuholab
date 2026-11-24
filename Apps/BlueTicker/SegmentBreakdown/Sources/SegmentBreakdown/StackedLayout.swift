@@ -337,23 +337,8 @@ enum StackedLayout {
             bars.append(column)
         }
 
-        var ribbons: [BreakdownRibbon] = []
-        if n > 1 {
-            for k in 1..<n {
-                for item in items[k] {
-                    guard case .connect(let from) = item.link,
-                        let source = bars[k - 1].first(where: { $0.key == from }),
-                        let target = bars[k].first(where: { $0.key == item.key })
-                    else { continue }
-                    ribbons.append(
-                        BreakdownRibbon(
-                            fromColumn: k - 1, key: item.key, colorIndex: target.colorIndex,
-                            leftTop: source.y, leftBottom: source.y + source.height,
-                            rightTop: target.y, rightBottom: target.y + target.height,
-                            leftX: source.x + source.width, rightX: target.x))
-                }
-            }
-        }
+        // 年と年の間の帯（つなぎ）は引かない。系列の同一性は色と積み上げ順（つながり先の位置）で示す。
+        let ribbons: [BreakdownRibbon] = []
 
         // 再編の組（split / merge / regroup）は帯を引かない。積み上げ順だけで位置をそろえる
         // （対応が決まる組は隣り合わせに積み、regroup は関連付けない）。

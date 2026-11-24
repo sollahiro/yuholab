@@ -69,8 +69,8 @@ import Testing
         #expect(Set(layout.bars[0].map(\.colorIndex)).count >= 7)
     }
 
-    /// GEM → エナジー・モビリティの血筋は、毎年同じ位置（下端）に積まれ、帯が交差しない。
-    @Test func ribbonsDoNotCrossAcrossYears() throws {
+    /// GEM → エナジー・モビリティの血筋は、毎年同じ位置（下端）に積まれ、帯は引かない。
+    @Test func latestIsLargestFirstAndPastFollowsIt() throws {
         let layout = try layout()
         func order(_ column: Int) -> [String] { layout.bars[column].sorted { $0.y > $1.y }.map(\.key) }
         // 最新は大きい順に下から。古い年は最新の序列に合わせる（GEM・CI は行き先の位置、終了した区分は上）。
@@ -79,12 +79,6 @@ import Testing
         // 26/03 の再編は GEM・コネクティブインダストリーズ → エナジー・モビリティ・コネクティブインダストリーズ（regroup）。
         // 対応が分からないので帯は引かず、「再編」の印も棒の中には出さない。
         #expect(layout.bars[4].allSatisfy { $0.mark == .none })
-        #expect(!layout.ribbons.contains { $0.key.hasPrefix("group|") })
-        for column in 0..<3 {
-            let ribbons = layout.ribbons.filter { $0.fromColumn == column }.sorted { $0.leftTop < $1.leftTop }
-            for (a, b) in zip(ribbons, ribbons.dropFirst()) {
-                #expect(a.rightTop <= b.rightTop + 1e-9, "column \(column): \(a.key) / \(b.key)")
-            }
-        }
+        #expect(layout.ribbons.isEmpty)
     }
 }
