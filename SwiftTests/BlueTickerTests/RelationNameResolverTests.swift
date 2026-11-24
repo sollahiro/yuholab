@@ -33,6 +33,33 @@ private func resolve(
         #expect(RelationNameNormalizer.normalize("Largan Precision Co.,Ltd.") == "LARGANPRECISION")
     }
 
+    @Test func normalizeStripsRemainingNoteMarkers() {
+        #expect(RelationNameNormalizer.normalize("●スズキ㈱") == "スズキ")
+        #expect(RelationNameNormalizer.normalize("日本ハム㈱*") == "日本ハム")
+        #expect(RelationNameNormalizer.normalize("リゾートトラスト　㈱*") == "リゾートトラスト")
+        #expect(RelationNameNormalizer.normalize("シャープ㈱(※１)") == "シャープ")
+        #expect(RelationNameNormalizer.normalize("株式会社ゼネラル※注４") == "ゼネラル")
+        #expect(RelationNameNormalizer.normalize("スギＨＤ㈱　※") == "スギホールディングス")
+    }
+
+    @Test func trailingAbbreviationsAreExpanded() {
+        #expect(RelationNameNormalizer.normalize("㈱りそなＨＤ") == "りそなホールディングス")
+        #expect(RelationNameNormalizer.normalize("ＡＮＡ　ＨＤ㈱　※")
+            == RelationNameNormalizer.normalize("ＡＮＡホールディングス株式会社"))
+        #expect(RelationNameNormalizer.normalize("㈱岡三証券G") == "岡三証券グループ")
+        // 英字の語の末尾の G は対象にしない。
+        #expect(RelationNameNormalizer.normalize("ＴＩＧ㈱") == "TIG")
+    }
+
+    @Test func hyphenAfterKatakanaIsLongVowel() {
+        // 有報の「－」（U+FF0D）表記の長音。EDINET 提出者名の「ー」と同じ照合用名になる。
+        #expect(RelationNameNormalizer.normalize("㈱みずほフィナンシャルグル－プ") == "みずほフィナンシャルグループ")
+        #expect(RelationNameNormalizer.normalize("㈱三菱ＵＦＪフィナンシャル・グル－プ")
+            == RelationNameNormalizer.normalize("株式会社三菱UFJフィナンシャル・グループ"))
+        // カタカナに続かないハイフンは従来どおり区切りとして消す。
+        #expect(RelationNameNormalizer.normalize("A-B CORP.") == "AB")
+    }
+
     @Test func listedFilerNameResolvesExactly() async {
         let dir = await directory()
         let result = resolve("株式会社大真空", ownCode: "6384", directory: dir)

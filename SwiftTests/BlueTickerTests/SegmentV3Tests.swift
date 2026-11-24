@@ -916,6 +916,58 @@ import Testing
         #expect((regroupReorgs[0]["to"] as? [[String: Any]])?.count == 2)
     }
 
+    /// 日立型: GEM → エナジー・モビリティ・コネクティブインダストリーズ。コネクティブインダストリーズは同じキーのまま前期が組み替えられている。
+    /// 消えた GEM と現れたエナジー・モビリティだけでは前期の合計が合わないので、組み替えられた同キーの区分を両側に入れる。
+    @Test func restatedSameKeyRowJoinsTheRegroupWhenItBalancesThePriorTotals() throws {
+        func make(_ local: String, _ value: Double, prior: Double? = nil) -> BreakdownRowPayload {
+            var row = row(local, local, value)
+            if let prior {
+                row.priorYearExternalSales = BreakdownMetricCellPayload(
+                    value: prior, basis: breakdownSourceXbrlFacts, source: local, decimals: -6)
+            }
+            return row
+        }
+        let old = [
+            make("GEM", 3_849_255_000_000), make("CI", 2_969_164_000_000), make("DS", 2_653_087_000_000),
+        ]
+        let new = [
+            make("EN", 3_200_844_000_000, prior: 2_562_363_000_000),
+            make("MOB", 1_320_631_000_000, prior: 1_169_750_000_000),
+            make("CI", 3_000_760_000_000, prior: 3_086_306_000_000),
+            make("DS", 2_756_551_000_000, prior: 2_653_087_000_000),
+        ]
+        let year = try object(old: old, new: new)
+        let reorgs = try #require(year[segmentWaterfallReorgsKey] as? [[String: Any]])
+        #expect(reorgs.count == 1)
+        let from = try #require(reorgs[0]["from"] as? [[String: Any]])
+        let to = try #require(reorgs[0]["to"] as? [[String: Any]])
+        #expect(Set(from.compactMap { $0["label"] as? String }) == ["GEM", "CI"])
+        #expect(Set(to.compactMap { $0["label"] as? String }) == ["EN", "MOB", "CI"])
+        // 前期の開示と同じ値の DS は、再編に入れない。
+        #expect(!from.contains { $0["label"] as? String == "DS" })
+    }
+
+    /// 前期列が合わない同キーの区分でも、足して合計が合わないなら再編に入れない（無関係な組替の巻き込み防止）。
+    @Test func restatedSameKeyRowIsLeftOutWhenItDoesNotBalance() throws {
+        func make(_ local: String, _ value: Double, prior: Double? = nil) -> BreakdownRowPayload {
+            var row = row(local, local, value)
+            if let prior {
+                row.priorYearExternalSales = BreakdownMetricCellPayload(
+                    value: prior, basis: breakdownSourceXbrlFacts, source: local, decimals: -6)
+            }
+            return row
+        }
+        let old = [make("A", 100_000_000), make("X", 50_000_000)]
+        let new = [
+            make("B", 120_000_000, prior: 90_000_000), make("C", 40_000_000, prior: 20_000_000),
+            make("X", 55_000_000, prior: 60_000_000),
+        ]
+        let year = try object(old: old, new: new)
+        let reorgs = try #require(year[segmentWaterfallReorgsKey] as? [[String: Any]])
+        let from = try #require(reorgs[0]["from"] as? [[String: Any]])
+        #expect(from.map { $0["label"] as? String } == ["A"])
+    }
+
     @Test func regroupSplitsIntoSplitAndReplaceByNearbyTotals() throws {
         // 日本郵船型: 不定期専用船 → 自動車・ドライバルク・エネルギー（split）、その他の事業 → その他（replace）
         let result = try object(

@@ -359,6 +359,11 @@ enum BreakdownPalette {
         Color(red: 1.00, green: 0.84, blue: 0.04),
         Color(red: 1.00, green: 0.39, blue: 0.51),
         Color(red: 0.56, green: 0.56, blue: 0.58),
+        // 1 列に 9 区分ある会社（日立など）でも色がかぶらないよう、`StackedLayout.paletteSize` まで足す。
+        Color(red: 0.00, green: 0.70, blue: 0.67),
+        Color(red: 0.64, green: 0.52, blue: 0.37),
+        Color(red: 0.37, green: 0.36, blue: 0.90),
+        Color(red: 0.78, green: 0.88, blue: 0.20),
     ]
 
     /// 負の番号（単一セグメントの棒）は系列の色を持たず、中立色。
@@ -435,25 +440,6 @@ private struct StackedBarChart: View {
                         context.resolve(Text(text).font(.caption2).foregroundStyle(Theme.textMuted)),
                         at: CGPoint(x: axisInset - 6, y: y(position)), anchor: .trailing)
                 }
-            }
-
-            for ribbon in layout.ribbons {
-                var path = Path()
-                let midX = (x(ribbon.leftX) + x(ribbon.rightX)) / 2
-                path.move(to: CGPoint(x: x(ribbon.leftX), y: y(ribbon.leftTop)))
-                path.addCurve(
-                    to: CGPoint(x: x(ribbon.rightX), y: y(ribbon.rightTop)),
-                    control1: CGPoint(x: midX, y: y(ribbon.leftTop)),
-                    control2: CGPoint(x: midX, y: y(ribbon.rightTop)))
-                path.addLine(to: CGPoint(x: x(ribbon.rightX), y: y(ribbon.rightBottom)))
-                path.addCurve(
-                    to: CGPoint(x: x(ribbon.leftX), y: y(ribbon.leftBottom)),
-                    control1: CGPoint(x: midX, y: y(ribbon.rightBottom)),
-                    control2: CGPoint(x: midX, y: y(ribbon.leftBottom)))
-                path.closeSubpath()
-                // 再編の塊のつなぎ（色なし）は中立色で、系列のつなぎよりさらに薄く。
-                let base = ribbon.colorIndex < 0 ? Theme.textMuted : BreakdownPalette.color(ribbon.colorIndex)
-                context.fill(path, with: .color(base.opacity(ribbon.colorIndex < 0 ? 0.16 : 0.22)))
             }
 
             for column in layout.bars {

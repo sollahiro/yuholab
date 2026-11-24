@@ -968,7 +968,11 @@ public extension BltServerContext {
                         audit = result.audit.map(llmBreakdownAuditPayload(from:))
                     }
                 } else {
-                    reason = breakdownNotApplicableUnknown
+                    // 表がある（1 セルのレイアウト表など）が列を選べない。本邦90％・海外なしの省略文があれば
+                    // その reason（決定論）、無ければ unknown（再試行）。
+                    reason = BreakdownExtractor.classifyGeographyOmission(
+                        sentences: BreakdownExtractor.segmentNoteSentences(xbrlDir: xbrlDir))
+                        ?? breakdownNotApplicableUnknown
                 }
             } else {
                 reason = breakdownNotApplicableUnknown

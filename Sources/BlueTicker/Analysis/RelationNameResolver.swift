@@ -22,6 +22,8 @@ public enum RelationNameNormalizer {
     public static func normalize(_ name: String, stripsTrailingParenthesis: Bool = false) -> String {
         var s = name.precomposedStringWithCompatibilityMapping.uppercased()
         s = replacing(s, noteMarkerPatterns, with: " ")
+        // カタカナ直後のハイフン類は長音（「グル－プ」→「グループ」）。区切りとして消す前に戻す。
+        s = replacing(s, [katakanaLongVowelHyphenPattern], with: "ー")
         // 法人格語（と大株主の名義の括弧書き）は、どちらが外側でも外れるまで繰り返す。
         var previous = ""
         while previous != s {
@@ -33,6 +35,10 @@ public enum RelationNameNormalizer {
             s = replacing(s, [trailingGroupPhrasePattern, englishCorporateSuffixPattern], with: "")
             s = trimmed(s)
         }
+        // 語尾の略称（「りそなＨＤ」「岡三証券G」）は正式な語にそろえる。EDINET 側の名前にも同じ規則を当てるので、
+        // 正式名と一致する相手だけが結ばれる（社名ごとの対応は持たない）。
+        s = replacing(s, [trailingHoldingsAbbreviationPattern], with: "ホールディングス")
+        s = replacing(s, [trailingGroupAbbreviationPattern], with: "グループ")
         s = replacing(s, [separatorPattern], with: "")
         return s
     }
@@ -56,8 +62,11 @@ public enum RelationNameNormalizer {
     /// NFKC 後（「㈱」→「(株)」、全角括弧 → 半角）。
     private static let noteMarkerPatterns: [NSRegularExpression] = [
         try! NSRegularExpression(pattern: #"\(\s*注\s*[0-9]*\s*\)[\s0-9,、.・]*"#),
-        try! NSRegularExpression(pattern: #"※\s*[0-9]*[\s,、]*"#),
-        try! NSRegularExpression(pattern: #"\*\s*[0-9]+[\s,、]*"#),
+        try! NSRegularExpression(pattern: #"\(\s*※[^()]*\)[\s0-9,、.・]*"#),
+        try! NSRegularExpression(pattern: #"※\s*(?:注\s*)?[0-9]*[\s,、]*"#),
+        try! NSRegularExpression(pattern: #"\*+\s*[0-9]*[\s,、]*"#),
+        // 先頭の印（「●スズキ㈱」。表の見出し・脚注の対応を示す記号）。
+        try! NSRegularExpression(pattern: #"^[\s●○◎◆◇■□▲△▼▽★☆]+"#),
     ]
 
     private static let japaneseCorporateFormPatterns: [NSRegularExpression] = [
@@ -82,13 +91,26 @@ public enum RelationNameNormalizer {
     private static let englishCorporateSuffixPattern = try! NSRegularExpression(
         pattern: #"(?:(?:(?<=[\s,.])|^)(?:CO|COMPANY|CORP|CORPORATION|INC|INCORPORATED|LTD|LIMITED|PLC|AG|SA|S\.A|GMBH|LLC|L\.L\.C|N\.V|B\.V|PTE|PTY|K\.K|KK)\.?[\s,]*)+$"#)
 
+    /// カタカナ直後のハイフン類（NFKC 後の「-」、ダッシュ、マイナス）。有報では長音「ー」を全角ハイフン「－」で書く社名がある
+    /// （「㈱みずほフィナンシャルグル－プ」）。
+    private static let katakanaLongVowelHyphenPattern = try! NSRegularExpression(
+        pattern: #"(?<=[ァ-ヶ])[-‐‑–—―−]"#)
+
+    /// 語尾の「HD」（NFKC・大文字後）。
+    private static let trailingHoldingsAbbreviationPattern = try! NSRegularExpression(
+        pattern: #"(?<=\S)\s*HD\s*$"#)
+
+    /// 日本語の社名に続く語尾の「G」（英字の語の末尾は対象にしない）。
+    private static let trailingGroupAbbreviationPattern = try! NSRegularExpression(
+        pattern: #"(?<=[ぁ-ヿ一-鿿])\s*G\s*$"#)
+
     /// 空白・中点・句読点・ハイフン類（長音「ー」は残す）。
     private static let separatorPattern = try! NSRegularExpression(
         pattern: #"[\s・･,，、。.．\-‐‑–—―−'’&＆]"#)
 }
 
 /// 正規化・解決規則の版。規則を変えたら上げる（全行の `resolver_key` がずれ、name_norm を作り直して解き直される）。
-public let relationNameResolverVersion = "resolver-v3"
+public let relationNameResolverVersion = "resolver-v4"
 
 /// EDINET 提出者名の照合索引（正規化した名前 → 提出者）。
 public struct RelationNameDirectory: Sendable {
