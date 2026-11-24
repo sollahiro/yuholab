@@ -854,6 +854,10 @@ enum BreakdownExtractor {
     /// 売上の語を必須にし、有形固定資産だけの 90% 文（「本邦に所在している有形固定資産の金額が…」）は拾わない。
     private static let geographyDomesticDominantPattern = try! NSRegularExpression(
         pattern: "(本邦(?!以外)|日本(?!以外)|国内(?!外))[^。]{0,40}(売上|営業収益|外部顧客からの収益|外部顧客への収益)[^。]{0,80}(90|９０)\\s*(％|%|パーセント)[^。]{0,20}(超|占め)")
+    /// 国内売上が「大部分を占める」ための省略（90% の数字を書かない言い回し。アイティメディア 2148）。
+    /// 省略の語を必須にし、事業の説明（「国内売上が大部分を占めている」）だけの文は拾わない。
+    private static let geographyDomesticMajorityPattern = try! NSRegularExpression(
+        pattern: "(本邦(?!以外)|日本(?!以外)|国内(?!外))[^。]{0,40}(売上|営業収益|収益)[^。]{0,60}大部分を占め[^。]{0,40}省略")
     /// 海外売上なし（「本邦以外の外部顧客への売上高がないため」「外部顧客への売上高は全て本邦」等）。
     private static let geographyNoOverseasSalesPatterns: [NSRegularExpression] = [
         "(本邦以外|日本以外|海外|国外)[^。]{0,40}(売上|営業収益|外部顧客からの収益|外部顧客への収益)[^。]{0,20}(が|は)(ない|無い|なく|ありません|存在しない|存在しません|ございません)",
@@ -929,7 +933,9 @@ enum BreakdownExtractor {
         if normalized.contains(where: { s in geographyNoOverseasSalesPatterns.contains { matches($0, s) } }) {
             return breakdownNotApplicableNoOverseasSales
         }
-        if normalized.contains(where: { matches(geographyDomesticDominantPattern, $0) }) {
+        if normalized.contains(where: {
+            matches(geographyDomesticDominantPattern, $0) || matches(geographyDomesticMajorityPattern, $0)
+        }) {
             return breakdownNotApplicableDomesticDominant90pct
         }
         return nil

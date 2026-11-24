@@ -25,6 +25,19 @@ import Testing
             == breakdownNotApplicableDomesticDominant90pct)
     }
 
+    /// 90% の数字を書かず「大部分を占める」と書く省略。
+    /// source: code=2148 アイティメディア doc_id=S100YHX3 page=78 field=geography
+    @Test func domesticMajorityWithoutNumberIsDomesticDominant() {
+        #expect(classify([
+            "（4）地域別に関する情報国内収益とされた外部顧客からの売上収益が連結損益計算書の売上収益の大部分を占めるため、地域別の売上収益の記載を省略しております。"
+        ]) == breakdownNotApplicableDomesticDominant90pct)
+        // 省略しない説明文、本邦以外の文は拾わない
+        #expect(classify(["当社の売上収益は国内の顧客が大部分を占めております。"]) == nil)
+        #expect(classify(["海外の外部顧客からの売上収益が大部分を占めるため、記載を省略しております。"]) == nil)
+        // 有形固定資産だけの文
+        #expect(classify(["本邦に所在している有形固定資産の金額が大部分を占めるため、記載を省略しております。"]) == nil)
+    }
+
     @Test func noOverseasSalesWinsOverNinetyPercent() {
         #expect(classify(["本邦以外の外部顧客への売上高がないため、該当事項はありません。"])
             == breakdownNotApplicableNoOverseasSales)
