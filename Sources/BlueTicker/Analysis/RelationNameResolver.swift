@@ -58,8 +58,11 @@ public enum RelationNameNormalizer {
     /// NFKC 後（「㈱」→「(株)」、全角括弧 → 半角）。
     private static let noteMarkerPatterns: [NSRegularExpression] = [
         try! NSRegularExpression(pattern: #"\(\s*注\s*[0-9]*\s*\)[\s0-9,、.・]*"#),
-        try! NSRegularExpression(pattern: #"※\s*[0-9]*[\s,、]*"#),
-        try! NSRegularExpression(pattern: #"\*\s*[0-9]+[\s,、]*"#),
+        try! NSRegularExpression(pattern: #"\(\s*※[^()]*\)[\s0-9,、.・]*"#),
+        try! NSRegularExpression(pattern: #"※\s*(?:注\s*)?[0-9]*[\s,、]*"#),
+        try! NSRegularExpression(pattern: #"\*+\s*[0-9]*[\s,、]*"#),
+        // 先頭の印（「●スズキ㈱」。表の見出し・脚注の対応を示す記号）。
+        try! NSRegularExpression(pattern: #"^[\s●○◎◆◇■□▲△▼▽★☆]+"#),
     ]
 
     private static let japaneseCorporateFormPatterns: [NSRegularExpression] = [

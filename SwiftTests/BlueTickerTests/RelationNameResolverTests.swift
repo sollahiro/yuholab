@@ -33,6 +33,15 @@ private func resolve(
         #expect(RelationNameNormalizer.normalize("Largan Precision Co.,Ltd.") == "LARGANPRECISION")
     }
 
+    @Test func normalizeStripsRemainingNoteMarkers() {
+        #expect(RelationNameNormalizer.normalize("●スズキ㈱") == "スズキ")
+        #expect(RelationNameNormalizer.normalize("日本ハム㈱*") == "日本ハム")
+        #expect(RelationNameNormalizer.normalize("リゾートトラスト　㈱*") == "リゾートトラスト")
+        #expect(RelationNameNormalizer.normalize("シャープ㈱(※１)") == "シャープ")
+        #expect(RelationNameNormalizer.normalize("株式会社ゼネラル※注４") == "ゼネラル")
+        #expect(RelationNameNormalizer.normalize("スギＨＤ㈱　※") == "スギHD")
+    }
+
     @Test func hyphenAfterKatakanaIsLongVowel() {
         // 有報の「－」（U+FF0D）表記の長音。EDINET 提出者名の「ー」と同じ照合用名になる。
         #expect(RelationNameNormalizer.normalize("㈱みずほフィナンシャルグル－プ") == "みずほフィナンシャルグループ")
