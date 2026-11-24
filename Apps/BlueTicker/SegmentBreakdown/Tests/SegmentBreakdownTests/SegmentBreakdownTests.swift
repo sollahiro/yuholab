@@ -48,7 +48,6 @@ import Testing
         #expect(["P", "M", "A"].allSatisfy { key in before.first { $0.key == key }?.mark == .reorg })
         #expect(before.first { $0.key == "L" }?.mark == BreakdownMark.none)
         // つなぎは L / R だけ（FY24→25 で 5 本、FY25→26 で 2 本）。食品へは出さない。
-        #expect(layout.ribbons.isEmpty)
     }
 
     @Test func stackingFitsUnderHeadroomAndStartsAtBottom() throws {
@@ -84,10 +83,9 @@ import Testing
         #expect(layout.bars[0].first { $0.key == "F" }?.mark == .ended)
         #expect(layout.bars[0].first { $0.key == "G" }?.mark == BreakdownMark.none)
         #expect(layout.series.map(\.label) == ["ゲーム", "音楽", "金融"])
-        #expect(layout.ribbons.isEmpty)
     }
 
-    @Test func renamedSeriesKeepsColorAndRibbon() throws {
+    @Test func renamedSeriesKeepsColor() throws {
         let json = """
             {"years":[
              {"fiscal_year":2026,"segments":[
@@ -97,7 +95,6 @@ import Testing
         let layout = StackedLayout.make(columns: try columns(json))
         #expect(layout.series.count == 1)
         #expect(layout.bars[0][0].colorIndex == layout.bars[1][0].colorIndex)
-        #expect(layout.ribbons.isEmpty)
         #expect(layout.bars[1][0].mark == BreakdownMark.none)
     }
 
@@ -157,7 +154,6 @@ import Testing
             BreakdownColumnInput(label: "FY2026", items: [BreakdownItemInput(key: "a", label: "A", value: 1, link: .none)])
         ])
         #expect(single.bars.count == 1)
-        #expect(single.ribbons.isEmpty)
         #expect(single.bars[0][0].mark == BreakdownMark.none)
     }
 
@@ -177,7 +173,6 @@ import Testing
         // 組替・終了の印は残らず、リボンは 3 系列 × 2 区間。
         #expect(layout.bars.joined().allSatisfy { $0.mark == BreakdownMark.none || $0.mark == .new })
         #expect(!layout.bars.joined().contains { $0.mark == .reorg || $0.mark == .ended })
-        #expect(layout.ribbons.isEmpty)
         // 最新期の前年比は合算した前年に対して出る。
         let rows = BreakdownSummary.segmentRows(columns: cols, layout: layout, profitByKey: [:])
         let food = try #require(rows.first { $0.key == "F" })
@@ -241,7 +236,6 @@ import Testing
             fromKeys: ["BULK", "OTH", "RE"], toKeys: ["AUTO", "DRY", "ENE", "STDOTH"])])
         let layout = StackedLayout.make(columns: cols)
         // 旧も新も複数（regroup）は対応が分からないので、帯を引かない（航空運送の系列だけ）。
-        #expect(layout.ribbons.isEmpty)
         // 組の行に「再編」「終了」の印は出ない。
         let marks = layout.bars.joined().filter { ["BULK", "OTH", "RE", "AUTO", "DRY", "ENE", "STDOTH"].contains($0.key) }.map(\.mark)
         #expect(marks.allSatisfy { $0 == .none })
@@ -421,6 +415,5 @@ import Testing
         // 単一→複数の年は、つながない。「再編」を出す。
         #expect(layout.bars[2].allSatisfy { $0.colorIndex >= 0 })
         #expect(layout.columnReorged == [false, false, true, false])
-        #expect(layout.ribbons.allSatisfy { $0.fromColumn == 2 })
     }
 }

@@ -79,6 +79,5 @@ import Testing
         // 26/03 の再編は GEM・コネクティブインダストリーズ → エナジー・モビリティ・コネクティブインダストリーズ（regroup）。
         // 対応が分からないので帯は引かず、「再編」の印も棒の中には出さない。
         #expect(layout.bars[4].allSatisfy { $0.mark == .none })
-        #expect(layout.ribbons.isEmpty)
     }
 }

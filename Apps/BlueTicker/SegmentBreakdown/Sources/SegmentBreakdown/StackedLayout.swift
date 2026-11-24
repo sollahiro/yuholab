@@ -65,22 +65,6 @@ struct BreakdownBar: Equatable, Identifiable {
     var id: String { "\(column)|\(key)" }
 }
 
-/// 棒と棒の間のつなぎ。4 点（左上・右上・右下・左下）。
-struct BreakdownRibbon: Equatable, Identifiable {
-    var fromColumn: Int
-    var key: String
-    /// 負のときは系列の色を持たない（再編の塊のつなぎ）。中立色で描く。
-    var colorIndex: Int
-    var leftTop: Double
-    var leftBottom: Double
-    var rightTop: Double
-    var rightBottom: Double
-    var leftX: Double
-    var rightX: Double
-
-    var id: String { "\(fromColumn)|\(key)" }
-}
-
 struct BreakdownSeries: Equatable, Identifiable {
     var id: String
     var label: String
@@ -93,7 +77,6 @@ struct BreakdownLayout: Equatable {
     /// 各列の棒の中心 x（0...1）。
     var columnCenters: [Double]
     var bars: [[BreakdownBar]]
-    var ribbons: [BreakdownRibbon]
     /// 凡例の並び（積み上げの下から上）。
     var series: [BreakdownSeries]
     /// 合計の文字を置くための上端の余白（0...1）。棒はこの下に収まる。
@@ -115,7 +98,7 @@ enum StackedLayout {
         let n = columns.count
         guard n > 0 else {
             return BreakdownLayout(
-                columnLabels: [], columnTotals: [], columnCenters: [], bars: [], ribbons: [], series: [],
+                columnLabels: [], columnTotals: [], columnCenters: [], bars: [], series: [],
                 headroom: headroom)
         }
         let items = columns.map { $0.items.filter { $0.value > 0 } }
@@ -337,15 +320,12 @@ enum StackedLayout {
             bars.append(column)
         }
 
-        // 年と年の間の帯（つなぎ）は引かない。系列の同一性は色と積み上げ順（つながり先の位置）で示す。
-        let ribbons: [BreakdownRibbon] = []
-
         // 再編の組（split / merge / regroup）は帯を引かない。積み上げ順だけで位置をそろえる
         // （対応が決まる組は隣り合わせに積み、regroup は関連付けない）。
 
         return BreakdownLayout(
             columnLabels: columns.map(\.label), columnTotals: totals, columnCenters: centers,
-            bars: bars, ribbons: ribbons, series: series, headroom: headroom,
+            bars: bars, series: series, headroom: headroom,
             columnReorged: columns.map(\.reorged))
     }
 

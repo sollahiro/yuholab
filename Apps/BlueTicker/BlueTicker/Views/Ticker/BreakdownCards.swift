@@ -442,25 +442,6 @@ private struct StackedBarChart: View {
                 }
             }
 
-            for ribbon in layout.ribbons {
-                var path = Path()
-                let midX = (x(ribbon.leftX) + x(ribbon.rightX)) / 2
-                path.move(to: CGPoint(x: x(ribbon.leftX), y: y(ribbon.leftTop)))
-                path.addCurve(
-                    to: CGPoint(x: x(ribbon.rightX), y: y(ribbon.rightTop)),
-                    control1: CGPoint(x: midX, y: y(ribbon.leftTop)),
-                    control2: CGPoint(x: midX, y: y(ribbon.rightTop)))
-                path.addLine(to: CGPoint(x: x(ribbon.rightX), y: y(ribbon.rightBottom)))
-                path.addCurve(
-                    to: CGPoint(x: x(ribbon.leftX), y: y(ribbon.leftBottom)),
-                    control1: CGPoint(x: midX, y: y(ribbon.rightBottom)),
-                    control2: CGPoint(x: midX, y: y(ribbon.leftBottom)))
-                path.closeSubpath()
-                // 再編の塊のつなぎ（色なし）は中立色で、系列のつなぎよりさらに薄く。
-                let base = ribbon.colorIndex < 0 ? Theme.textMuted : BreakdownPalette.color(ribbon.colorIndex)
-                context.fill(path, with: .color(base.opacity(ribbon.colorIndex < 0 ? 0.16 : 0.22)))
-            }
-
             for column in layout.bars {
                 for bar in column {
                     let rect = CGRect(x: x(bar.x), y: y(bar.y), width: w(bar.width), height: y(bar.height))
