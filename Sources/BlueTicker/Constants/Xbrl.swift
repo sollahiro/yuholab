@@ -466,6 +466,22 @@ enum Xbrl {
         "CostOfSalesOfCompletedConstructionContractsCNS",
     ]
 
+    /// 売上 − 売上原価 − 販管費 = 営業利益 の一致を確かめる計算法だけが使う追加の売上タグ。
+    static let consistentCostSalesExtraSalesTags: [String] = [
+        "BusinessRevenue",
+        "OperatingRevenueRWY",
+        "OperatingRevenue1",
+        "OperatingRevenueIFRS",
+        "NetSalesOfGoodsRevOA",
+    ]
+
+    /// 同じく追加の原価タグ。鉄道の「運輸業等営業費及び売上原価」は販管費を含まない原価の合計行。
+    static let consistentCostSalesExtraCostTags: [String] = [
+        "CostOfBusinessRevenue",
+        "OperatingExpensesAndCostOfSalesOfTransportationRWY",
+        "CostOfSalesIFRS",
+    ]
+
     struct BusinessGrossProfitComponent {
         let label: String
         let tags: [String]

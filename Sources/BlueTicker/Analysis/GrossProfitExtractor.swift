@@ -118,9 +118,49 @@ enum GrossProfitExtractor {
             }
         }
 
+        // 売上高・売上原価・販管費が揃い、営業利益と一致するときの計算法。
+        // 売上の表記が通常の計算法の対象外（事業収益・営業収益など）でも、原価が開示されていて
+        // 売上 − 原価 − 販管費 = 営業利益 が成り立つなら、事業利益は成立する。
+        if let consistent = extractConsistentSalesCostSGA(fieldSet: fieldSet, accountingStandard: accountingStandard) {
+            return consistent
+        }
+
         return GrossProfitResult(
             grossProfit: nil, grossProfitPrior: nil, grossProfitLabel: nil,
             method: "not_found", accountingStandard: accountingStandard
+        )
+    }
+
+    /// 売上 − 売上原価 − 販管費 が営業利益に一致する年度だけ、売上 − 売上原価 を売上総利益にする。
+    /// 一致を条件にするので、売上原価を持たない会社（NTT 等）や、研究開発費など販管費の外に
+    /// 費用がある会社は対象にならず、利益を作り出すことはない。
+    private static func extractConsistentSalesCostSGA(
+        fieldSet: FieldSet, accountingStandard: String
+    ) -> GrossProfitResult? {
+        let salesTags = Xbrl.businessRevenueTags + Xbrl.operatingRevenueWithoutMerchandiseCogsTags
+            + Xbrl.grossProfitSalesTags + Xbrl.consistentCostSalesExtraSalesTags
+        let costTags = Xbrl.grossProfitCostsTags + Xbrl.consistentCostSalesExtraCostTags
+        let sales = resolveItem(fieldSet, tags: salesTags)
+        let costs = resolveItem(fieldSet, tags: costTags)
+        let sga = resolveItem(fieldSet, tags: Xbrl.sgaDirectTags)
+        let op = resolveItem(fieldSet, tags: Xbrl.operatingProfitDirectTags)
+        guard sales.tag != nil, costs.tag != nil, sga.tag != nil, op.tag != nil else { return nil }
+
+        func gross(_ s: Double?, _ c: Double?, _ g: Double?, _ o: Double?) -> Double? {
+            guard let s, let c, let g, let o, s > 0 else { return nil }
+            // 誤差は売上の 0.1% まで（百万円丸めの差を許す）。
+            guard abs(s - c - g - o) <= s * 0.001 else { return nil }
+            return s - c
+        }
+        let current = gross(sales.current, costs.current, sga.current, op.current)
+        let prior = gross(sales.prior, costs.prior, sga.prior, op.prior)
+        guard current != nil || prior != nil else { return nil }
+        return GrossProfitResult(
+            grossProfit: current,
+            grossProfitPrior: prior,
+            grossProfitLabel: nil,
+            method: "computed_consistent",
+            accountingStandard: accountingStandard
         )
     }
 
