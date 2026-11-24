@@ -274,7 +274,7 @@ func reresolveCompanyRelations(
     db: Database, directory: RelationNameDirectory, subsidiaryIndex: SubsidiaryNameIndex,
     changedNames: Set<String>, logger: Logger? = nil
 ) async throws -> Int {
-    func reresolve(_ rows: [CompanyRelation], renormalize: Bool) async throws -> (
+    @Sendable func reresolve(_ rows: [CompanyRelation], renormalize: Bool) async throws -> (
         changed: Int, keyOnly: [UUID]
     ) {
         var keyOnly: [UUID] = []
