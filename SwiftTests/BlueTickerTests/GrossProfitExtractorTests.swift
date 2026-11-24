@@ -633,4 +633,73 @@ import Foundation
         #expect(result.grossProfit == nil)
         #expect(result.grossProfitPrior == nil)
     }
+
+    // MARK: - 売上・売上原価・販管費が営業利益と一致する計算法
+
+    private func duration(_ ns: String, _ tag: String, _ current: Int, _ prior: Int) -> String {
+        """
+        <\(ns):\(tag) contextRef="CurrentYearDuration" unitRef="JPY" decimals="-3">\(current)</\(ns):\(tag)>
+        <\(ns):\(tag) contextRef="Prior1YearDuration" unitRef="JPY" decimals="-3">\(prior)</\(ns):\(tag)>
+        """
+    }
+
+    /// 鉄道（297A）: 営業収益 − 運輸業等営業費及び売上原価 − 販管費 = 営業利益。
+    @Test func testConsistentSalesCostSgaRailway() {
+        let xml = XBRLTestSupport.makeXbrlDuration([
+            duration("jppfs_cor", "OperatingRevenueRWY", 107_422_042_000, 100_000_000_000),
+            duration("jppfs_cor", "OperatingExpensesAndCostOfSalesOfTransportationRWY", 74_420_453_000, 70_000_000_000),
+            duration("jppfs_cor", "SellingGeneralAndAdministrativeExpenses", 29_087_540_000, 27_000_000_000),
+            duration("jppfs_cor", "OperatingIncome", 3_914_049_000, 3_000_000_000),
+        ].joined(separator: "\n"))
+        XBRLTestSupport.withXbrlDir(xml) { dir in
+            let result = extract(in: dir)
+            #expect(result.method == "computed_consistent")
+            // 取り込み時の単位換算で Double の末尾が揺れるため、完全一致ではなく誤差つきで比べる。
+            #expect(abs((result.grossProfit ?? 0) - (107_422_042_000 - 74_420_453_000)) < 1)
+            #expect(abs((result.grossProfitPrior ?? 0) - 30_000_000_000) < 1)
+        }
+    }
+
+    /// 創薬（4263）: 事業収益 − 事業原価 − 販管費 = 営業利益。
+    @Test func testConsistentSalesCostSgaBusinessRevenue() {
+        let xml = XBRLTestSupport.makeXbrlDuration([
+            duration("jppfs_cor", "BusinessRevenue", 1_000_000_000, 900_000_000),
+            duration("jppfs_cor", "CostOfBusinessRevenue", 200_000_000, 180_000_000),
+            duration("jppfs_cor", "SellingGeneralAndAdministrativeExpenses", 900_000_000, 850_000_000),
+            duration("jppfs_cor", "OperatingIncome", -100_000_000, -130_000_000),
+        ].joined(separator: "\n"))
+        XBRLTestSupport.withXbrlDir(xml) { dir in
+            let result = extract(in: dir)
+            #expect(result.method == "computed_consistent")
+            #expect(result.grossProfit == 800_000_000)
+            #expect(result.grossProfitPrior == 720_000_000)
+        }
+    }
+
+    /// 研究開発費など販管費の外に費用があり、営業利益と一致しないときは作らない。
+    @Test func testConsistentSalesCostSgaRejectsMismatch() {
+        let xml = XBRLTestSupport.makeXbrlDuration([
+            duration("jppfs_cor", "BusinessRevenue", 497_211_000, 400_000_000),
+            duration("jppfs_cor", "CostOfBusinessRevenue", 17_387_000, 15_000_000),
+            duration("jppfs_cor", "SellingGeneralAndAdministrativeExpenses", 562_525_000, 500_000_000),
+            duration("jppfs_cor", "OperatingIncome", -330_161_000, -300_000_000),
+        ].joined(separator: "\n"))
+        XBRLTestSupport.withXbrlDir(xml) { dir in
+            let result = extract(in: dir)
+            #expect(result.method == "not_found")
+            #expect(result.grossProfit == nil)
+        }
+    }
+
+    /// 売上原価がない会社（NTT 型）は、販管費と営業利益があっても作らない。
+    @Test func testConsistentSalesCostSgaNeedsCost() {
+        let xml = XBRLTestSupport.makeXbrlDuration([
+            duration("jppfs_cor", "BusinessRevenue", 1_000_000_000, 900_000_000),
+            duration("jppfs_cor", "SellingGeneralAndAdministrativeExpenses", 900_000_000, 850_000_000),
+            duration("jppfs_cor", "OperatingIncome", 100_000_000, 50_000_000),
+        ].joined(separator: "\n"))
+        XBRLTestSupport.withXbrlDir(xml) { dir in
+            #expect(extract(in: dir).method == "not_found")
+        }
+    }
 }
