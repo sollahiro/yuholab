@@ -24,6 +24,8 @@ struct BreakdownItemInput: Equatable {
 struct BreakdownReorgGroup: Equatable {
     var fromKeys: [String]
     var toKeys: [String]
+    /// 旧も新も複数（regroup）。移り先の対応が分からない。
+    var isRegroup: Bool { fromKeys.count > 1 && toKeys.count > 1 }
 }
 
 struct BreakdownColumnInput: Equatable {
@@ -199,7 +201,7 @@ enum StackedLayout {
             return root
         }
         for k in stride(from: n - 1, through: 1, by: -1) {
-            for group in columns[k].groups {
+            for group in columns[k].groups where !group.isRegroup {
                 func ids(_ keys: [String], _ column: Int) -> [String] {
                     keys.compactMap { key in
                         items[column].first { $0.key == key }.flatMap { seriesIDs[column][$0.key] }
@@ -362,8 +364,18 @@ enum StackedLayout {
                     let leftBottom = source.map { $0.y + $0.height }.max() ?? first.y + first.height
                     let rightTop = target.map(\.y).min() ?? second.y
                     let rightBottom = target.map { $0.y + $0.height }.max() ?? second.y + second.height
-                    // 塊のつなぎは、旧区分の色（再編先の色にそろえてある）で帯を切り分け、
-                    // 左右の高さの比で対応づける。色が前の年から後の年へ途切れずに続く。
+                    // 旧 n・新 m（regroup）は、どの旧区分がどの新区分へ移ったかが分からないので、
+                    // 色を付けず中立色の 1 本の帯で結ぶ（色で対応があるように見せない）。
+                    if group.isRegroup {
+                        ribbons.append(
+                            BreakdownRibbon(
+                                fromColumn: k - 1, key: "group|\(k)|\(index)|0", colorIndex: -1,
+                                leftTop: leftTop, leftBottom: leftBottom, rightTop: rightTop,
+                                rightBottom: rightBottom, leftX: first.x + first.width, rightX: second.x))
+                        continue
+                    }
+                    // 旧 1 つ・新 n（split）、旧 n・新 1（merge）、1 対 1 は、対応が決まるので旧区分の色（再編先の色にそろえてある）で
+                    // 帯を切り分け、左右の高さの比で対応づける。色が前の年から後の年へ途切れずに続く。
                     let orderedSource = source.sorted { $0.y < $1.y }
                     let orderedTarget = target.sorted { $0.y < $1.y }
                     // 上から数えた各棒の下端の位置（0〜1）。

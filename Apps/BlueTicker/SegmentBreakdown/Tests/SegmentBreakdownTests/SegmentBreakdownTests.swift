@@ -256,7 +256,9 @@ import Testing
         // 帯は、航空運送の系列 1 本 + 組の切り分け（旧区分の色）。組の帯は旧区分の範囲を隙間なく覆う。
         let groupSlices = layout.ribbons.filter { $0.key.hasPrefix("group|") }
         #expect(layout.ribbons.count == 1 + groupSlices.count)
-        #expect(groupSlices.allSatisfy { $0.colorIndex >= 0 })
+        // regroup（旧 3・新 4）は対応が分からないので、色を付けず中立色の 1 本。
+        #expect(groupSlices.count == 1)
+        #expect(groupSlices.allSatisfy { $0.colorIndex == -1 })
         let oldBars = layout.bars[0].filter { ["BULK", "OTH", "RE"].contains($0.key) }
         #expect(abs((groupSlices.map(\.leftTop).min() ?? 0) - (oldBars.map(\.y).min() ?? -1)) < 1e-9)
         #expect(abs((groupSlices.map(\.leftBottom).max() ?? 0) - (oldBars.map { $0.y + $0.height }.max() ?? -1)) < 1e-9)
@@ -389,8 +391,8 @@ import Testing
         #expect(Set(layout.bars.joined().map(\.colorIndex)).count == 3)
     }
 
-    // メディア工房 3815: 旧 4 区分 → 新 2 区分の regroup。大きい順に対応づけ、余りは最後の新区分の色。
-    @Test func regroupSourcesAreColoredByRankAndExtrasFollowTheLastDescendant() throws {
+    // メディア工房 3815: 旧 3 区分 → 新 2 区分の regroup。対応が分からないので、旧区分の色を新区分にそろえない。
+    @Test func regroupSourcesKeepTheirOwnColorsBecauseTheMappingIsUnknown() throws {
         let json = """
             {"years":[
              {"fiscal_year":2024,"line_cut":true,"segments":[
@@ -405,9 +407,9 @@ import Testing
             """
         let layout = StackedLayout.make(columns: try columns(json))
         func color(_ column: Int, _ key: String) -> Int? { layout.bars[column].first { $0.key == key }?.colorIndex }
-        #expect(color(0, "DC") == color(1, "FT"))
-        #expect(color(0, "O2O") == color(1, "ENT"))
-        #expect(color(0, "SNS") == color(1, "ENT"))
+        // 同じ列の中では別の色（旧と新の対応は付けない）。
+        #expect(Set(["DC", "O2O", "SNS"].compactMap { color(0, $0) }).count == 3)
+        #expect(Set(["ENT", "FT"].compactMap { color(1, $0) }).count == 2)
     }
 
     // さいか屋 8254: 過去 2 年は報告セグメントが無い（連結合計だけ）。単一セグメントの棒にし、前年とはつながない。
