@@ -355,50 +355,8 @@ enum StackedLayout {
             }
         }
 
-        if n > 1 {
-            for k in 1..<n {
-                for (index, group) in columns[k].groups.enumerated() {
-                    let source = bars[k - 1].filter { group.fromKeys.contains($0.key) }
-                    let target = bars[k].filter { group.toKeys.contains($0.key) }
-                    guard let first = source.first, let second = target.first else { continue }
-                    let leftTop = source.map(\.y).min() ?? first.y
-                    let leftBottom = source.map { $0.y + $0.height }.max() ?? first.y + first.height
-                    let rightTop = target.map(\.y).min() ?? second.y
-                    let rightBottom = target.map { $0.y + $0.height }.max() ?? second.y + second.height
-                    // 旧 n・新 m（regroup）は、どの旧区分がどの新区分へ移ったかが分からず、積み上げ順も隣り合わせにしない。
-                    // 帯は引かない（垣根を超えた再編は関連付けない）。
-                    if group.isRegroup { continue }
-                    // 旧 1 つ・新 n（split）、旧 n・新 1（merge）、1 対 1 は、対応が決まるので旧区分の色（再編先の色にそろえてある）で
-                    // 帯を切り分け、左右の高さの比で対応づける。色が前の年から後の年へ途切れずに続く。
-                    let orderedSource = source.sorted { $0.y < $1.y }
-                    let orderedTarget = target.sorted { $0.y < $1.y }
-                    // 上から数えた各棒の下端の位置（0〜1）。
-                    func edges(_ bars: [BreakdownBar], top: Double, bottom: Double) -> [Double] {
-                        let span = bottom - top
-                        guard span > 0 else { return [1] }
-                        return bars.map { min(max(($0.y + $0.height - top) / span, 0), 1) }
-                    }
-                    let sourceEdges = edges(orderedSource, top: leftTop, bottom: leftBottom)
-                    var cuts = Set([0.0, 1.0])
-                    cuts.formUnion(sourceEdges)
-                    cuts.formUnion(edges(orderedTarget, top: rightTop, bottom: rightBottom))
-                    let sortedCuts = cuts.sorted()
-                    for (slice, pair) in zip(sortedCuts, sortedCuts.dropFirst()).enumerated() where pair.1 - pair.0 > 1e-9 {
-                        let mid = (pair.0 + pair.1) / 2
-                        let barIndex = sourceEdges.firstIndex { mid <= $0 } ?? max(orderedSource.count - 1, 0)
-                        let color = orderedSource[min(barIndex, orderedSource.count - 1)].colorIndex
-                        ribbons.append(
-                            BreakdownRibbon(
-                                fromColumn: k - 1, key: "group|\(k)|\(index)|\(slice)", colorIndex: color,
-                                leftTop: leftTop + (leftBottom - leftTop) * pair.0,
-                                leftBottom: leftTop + (leftBottom - leftTop) * pair.1,
-                                rightTop: rightTop + (rightBottom - rightTop) * pair.0,
-                                rightBottom: rightTop + (rightBottom - rightTop) * pair.1,
-                                leftX: first.x + first.width, rightX: second.x))
-                    }
-                }
-            }
-        }
+        // 再編の組（split / merge / regroup）は帯を引かない。積み上げ順だけで位置をそろえる
+        // （対応が決まる組は隣り合わせに積み、regroup は関連付けない）。
 
         return BreakdownLayout(
             columnLabels: columns.map(\.label), columnTotals: totals, columnCenters: centers,
