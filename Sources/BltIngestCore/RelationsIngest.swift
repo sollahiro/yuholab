@@ -133,10 +133,11 @@ func runRelationsIngest(
 
     let finalIndex = subsidiaryIndex
     let finalNames = changedNames
-    let reresolved = try await withDbRetry(logger: logger, context: "関係取り込み 解き直し") {
-        try await reresolveCompanyRelations(
-            db: db, directory: directory, subsidiaryIndex: finalIndex, changedNames: finalNames)
-    }
+    // 再試行は 1 ページ（keyset 2000 行）ごと（reresolveCompanyRelations の中）。全体を 1 回の操作にすると、
+    // 規則の版上げで全行が対象のとき 60 秒のタイムアウトを毎回超える。
+    let reresolved = try await reresolveCompanyRelations(
+        db: db, directory: directory, subsidiaryIndex: finalIndex, changedNames: finalNames,
+        logger: logger)
     return RelationsIngestSummary(
         attempted: attempted, stored: stored, failed: failed, skipped: skipped, reresolved: reresolved)
 }
@@ -267,13 +268,17 @@ func loadSubsidiaryNameIndex(db: Database) async throws -> SubsidiaryNameIndex {
 /// 解き直し。(a) `resolver_key` が今の名簿とずれた行（keyset）と、(b) 子会社索引の親が変わった名前の
 /// 顧客・関連会社の行（`name_norm` 索引）だけを読む。結果が変わった行だけ書き、その数を返す
 /// （名簿の指紋だけがずれた行は指紋だけをまとめて書く）。
+/// DB の再試行は 1 ページ（1 チャンク）ごと。書いた行は `resolver_key` が今の指紋になるので、再試行しても
+/// 済んだ行は対象から外れ、同じ行を二重に数えない。
 func reresolveCompanyRelations(
     db: Database, directory: RelationNameDirectory, subsidiaryIndex: SubsidiaryNameIndex,
-    changedNames: Set<String>
+    changedNames: Set<String>, logger: Logger? = nil
 ) async throws -> Int {
-    var changed = 0
-    func reresolve(_ rows: [CompanyRelation], renormalize: Bool) async throws -> [UUID] {
+    @Sendable func reresolve(_ rows: [CompanyRelation], renormalize: Bool) async throws -> (
+        changed: Int, keyOnly: [UUID]
+    ) {
         var keyOnly: [UUID] = []
+        var changed = 0
         for row in rows {
             let before = (row.nameNorm, row.relatedCode, row.resolution, row.needsReview)
             // 名簿の指紋には正規化の版も入るので、指紋がずれた行は name_norm も今の規則で作り直す。
@@ -286,23 +291,32 @@ func reresolveCompanyRelations(
                 keyOnly.append(id)
             }
         }
-        return keyOnly
+        return (changed, keyOnly)
     }
 
+    var changed = 0
     var after: UUID?
     while true {
-        var query = CompanyRelation.query(on: db)
-            .filter(\.$kind != relationKindNone)
-            .group(.or) { $0.filter(\.$resolverKey == nil).filter(\.$resolverKey != directory.fingerprint) }
-        if let after { query = query.filter(\.$id > after) }
-        let page = try await query.sort(\.$id).limit(relationsKeysetPage).all()
-        let keyOnly = try await reresolve(page, renormalize: true)
-        if !keyOnly.isEmpty {
-            try await CompanyRelation.query(on: db).filter(\.$id ~~ keyOnly)
-                .set(\.$resolverKey, to: directory.fingerprint).update()
+        let cursor = after
+        let fingerprint = directory.fingerprint
+        let (pageCount, lastID, pageChanged) = try await withDbRetry(
+            logger: logger, context: "関係取り込み 解き直し"
+        ) {
+            var query = CompanyRelation.query(on: db)
+                .filter(\.$kind != relationKindNone)
+                .group(.or) { $0.filter(\.$resolverKey == nil).filter(\.$resolverKey != fingerprint) }
+            if let cursor { query = query.filter(\.$id > cursor) }
+            let page = try await query.sort(\.$id).limit(relationsKeysetPage).all()
+            let result = try await reresolve(page, renormalize: true)
+            if !result.keyOnly.isEmpty {
+                try await CompanyRelation.query(on: db).filter(\.$id ~~ result.keyOnly)
+                    .set(\.$resolverKey, to: fingerprint).update()
+            }
+            return (page.count, page.last?.id, result.changed)
         }
-        guard page.count == relationsKeysetPage, let last = page.last?.id else { break }
-        after = last
+        changed += pageChanged
+        guard pageCount == relationsKeysetPage, let lastID else { break }
+        after = lastID
     }
 
     let indexedKinds = [relationKindCustomer, relationKindAffiliate]
@@ -312,11 +326,14 @@ func reresolveCompanyRelations(
     while start < names.count {
         let chunk = Array(names[start..<min(start + relationsInsertChunk, names.count)])
         start += chunk.count
-        let rows = try await CompanyRelation.query(on: db)
-            .filter(\.$nameNorm ~~ chunk)
-            .filter(\.$kind ~~ indexedKinds)
-            .all()
-        _ = try await reresolve(rows, renormalize: false)
+        let chunkChanged = try await withDbRetry(logger: logger, context: "関係取り込み 解き直し(子会社索引)") {
+            let rows = try await CompanyRelation.query(on: db)
+                .filter(\.$nameNorm ~~ chunk)
+                .filter(\.$kind ~~ indexedKinds)
+                .all()
+            return try await reresolve(rows, renormalize: false).changed
+        }
+        changed += chunkChanged
     }
     return changed
 }
