@@ -654,8 +654,9 @@ import Foundation
         XBRLTestSupport.withXbrlDir(xml) { dir in
             let result = extract(in: dir)
             #expect(result.method == "computed_consistent")
-            #expect(result.grossProfit == 107_422_042_000 - 74_420_453_000)
-            #expect(result.grossProfitPrior == 30_000_000_000)
+            // 取り込み時の単位換算で Double の末尾が揺れるため、完全一致ではなく誤差つきで比べる。
+            #expect(abs((result.grossProfit ?? 0) - (107_422_042_000 - 74_420_453_000)) < 1)
+            #expect(abs((result.grossProfitPrior ?? 0) - 30_000_000_000) < 1)
         }
     }
 
