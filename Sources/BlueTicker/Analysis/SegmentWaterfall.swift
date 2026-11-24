@@ -250,9 +250,38 @@ public enum SegmentWaterfall {
         let newRows = rows(payload)
         let oldKeys = Set(oldRows.map(\.key))
         let newKeys = Set(newRows.map(\.key))
-        let gone = oldRows.filter { !newKeys.contains($0.key) && !connectedOld.contains($0.key) }
-        let added = newRows.filter { !oldKeys.contains($0.key) && !connectedNew.contains($0.key) }
+        var gone = oldRows.filter { !newKeys.contains($0.key) && !connectedOld.contains($0.key) }
+        var added = newRows.filter { !oldKeys.contains($0.key) && !connectedNew.contains($0.key) }
         guard !gone.isEmpty, !added.isEmpty else { return [] }
+        // 同じキーのまま値だけ組み替えられた区分（前期列が前期の開示と合わない）は、再編の一部でもある。
+        // 旧区分の一部が同じ名前の区分へ移ると、消えた旧区分と現れた新区分だけでは前期の合計が合わない。
+        // 組み替えられた同キーの区分を足すと合計が合うときだけ、その区分を旧・新の両側に入れる。
+        let restatedShared = newRows.filter { entry in
+            guard oldKeys.contains(entry.key), !connectedNew.contains(entry.key) else { return false }
+            return isRestated(row: entry.row, previous: previous.payload)
+        }
+        if !restatedShared.isEmpty {
+            func filedTotal(_ rows: [(key: String, row: BreakdownRowPayload)]) -> Double? {
+                let values = rows.compactMap { $0.row.externalSales?.value }
+                return values.count == rows.count ? values.reduce(0, +) : nil
+            }
+            func restatedTotal(_ rows: [(key: String, row: BreakdownRowPayload)]) -> Double? {
+                let values = rows.compactMap { $0.row.priorYearExternalSales?.value }
+                return values.count == rows.count ? values.reduce(0, +) : nil
+            }
+            func balances(
+                _ from: [(key: String, row: BreakdownRowPayload)],
+                _ to: [(key: String, row: BreakdownRowPayload)]
+            ) -> Bool {
+                guard let filed = filedTotal(from), let restated = restatedTotal(to) else { return false }
+                return abs(filed - restated) <= max(1.0, abs(filed) * regroupExactTolerance)
+            }
+            let sharedOld = oldRows.filter { old in restatedShared.contains { $0.key == old.key } }
+            if !balances(gone, added), balances(gone + sharedOld, added + restatedShared) {
+                gone += sharedOld
+                added += restatedShared
+            }
+        }
         func side(_ rows: [(key: String, row: BreakdownRowPayload)]) -> [[String: Any]] {
             rows.compactMap { entry in
                 guard var item = metricItem(entry.row, metric: metric) else { return nil }

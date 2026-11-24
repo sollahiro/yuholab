@@ -8,13 +8,13 @@ import Testing
     static let json = """
         {"years":[
          {"fiscal_year":2026,"line_cut":true,"segments":[
-          {"label":"コネクティブインダストリーズ","segment_key":"CI","value":3000,"prior":{"decision":"break","segment_key":"CI"}},
+          {"label":"コネクティブインダストリーズ","segment_key":"CI","value":3000,"prior":{"decision":"break","segment_key":"CI","from":["AUTO","GEM","CI"]}},
           {"label":"デジタルシステム＆サービス","segment_key":"DS","value":2756,"prior":{"decision":"connect","segment_key":"DS"}},
           {"label":"エナジー","segment_key":"EN","value":3200,"prior":{"decision":"reorg","from":["AUTO","GEM"]}},
           {"label":"モビリティ","segment_key":"MOB","value":1320,"prior":{"decision":"reorg","from":["AUTO","GEM"]}},
           {"label":"その他","segment_key":"OTH","value":275,"prior":{"decision":"connect","segment_key":"OTH"}}],
-          "reorgs":[{"kind":"regroup","from":[{"segment_key":"AUTO","value":0},{"segment_key":"GEM","value":3849}],
-           "to":[{"segment_key":"EN","value":3200},{"segment_key":"MOB","value":1320}]}]},
+          "reorgs":[{"kind":"regroup","from":[{"segment_key":"AUTO","value":0},{"segment_key":"GEM","value":3849},{"segment_key":"CI","value":2969}],
+           "to":[{"segment_key":"EN","value":3200},{"segment_key":"MOB","value":1320},{"segment_key":"CI","value":3000}]}]},
          {"fiscal_year":2025,"line_cut":true,"segments":[
           {"label":"オートモティブシステム","segment_key":"AUTO","value":0,"prior":{"decision":"connect","segment_key":"AUTO"}},
           {"label":"コネクティブインダストリーズ","segment_key":"CI","value":2969,"prior":{"decision":"connect","segment_key":"CI"}},
@@ -73,8 +73,14 @@ import Testing
     @Test func ribbonsDoNotCrossAcrossYears() throws {
         let layout = try layout()
         func order(_ column: Int) -> [String] { layout.bars[column].sorted { $0.y > $1.y }.map(\.key) }
-        #expect(order(3) == ["GEM", "CI", "DS", "OTH"])
-        #expect(order(4) == ["EN", "MOB", "CI", "DS", "OTH"])
+        // 再編の組（GEM・CI → EN・MOB・CI）は両年とも下に隣り合わせで、DS・その他が上に続く。
+        #expect(Set(order(3).prefix(2)) == ["GEM", "CI"])
+        #expect(Set(order(4).prefix(3)) == ["EN", "MOB", "CI"])
+        #expect(order(3).suffix(2) == ["DS", "OTH"])
+        #expect(order(4).suffix(2) == ["DS", "OTH"])
+        // 26/03 の再編は GEM・コネクティブインダストリーズ → エナジー・モビリティ・コネクティブインダストリーズ（有報の前期列と一致）。
+        // コネクティブインダストリーズは「再編」の印を出さず、帯で結ぶ。
+        #expect(layout.bars[4].allSatisfy { $0.mark == .none })
         for column in 0..<4 {
             let ribbons = layout.ribbons.filter { $0.fromColumn == column }.sorted { $0.leftTop < $1.leftTop }
             for (a, b) in zip(ribbons, ribbons.dropFirst()) {
