@@ -234,34 +234,21 @@ import Testing
           {"label":"不動産業","segment_key":"RE","value":3}]}]}
         """
 
-    @Test func regroupIsStackedAdjacentAndJoinedByOneNeutralRibbon() throws {
+    @Test func regroupIsNotClusteredNorJoinedAndLatestColumnIsLargestFirst() throws {
         let cols = BreakdownBuilder.collapsingReorgs(try columns(nykJSON))
         // regroup は 1 本に集約しない（旧 3・新 4）。
         #expect(cols[0].items.count == 4)
         #expect(cols[1].groups == [BreakdownReorgGroup(
             fromKeys: ["BULK", "OTH", "RE"], toKeys: ["AUTO", "DRY", "ENE", "STDOTH"])])
         let layout = StackedLayout.make(columns: cols)
-
-        func positions(_ column: Int, _ keys: Set<String>) -> [Int] {
-            layout.bars[column].enumerated().filter { keys.contains($0.element.key) }.map(\.offset)
-        }
-        for (column, keys) in [(0, Set(["BULK", "OTH", "RE"])), (1, Set(["AUTO", "DRY", "ENE", "STDOTH"]))] {
-            let p = positions(column, keys)
-            #expect(p.count == keys.count)
-            #expect(p == Array((p.first ?? 0)..<((p.first ?? 0) + p.count)))
-        }
+        // 旧も新も複数（regroup）は対応が分からないので、帯を引かない（航空運送の系列だけ）。
+        #expect(layout.ribbons.count == 1)
         // 組の行に「再編」「終了」の印は出ない。
         let marks = layout.bars.joined().filter { ["BULK", "OTH", "RE", "AUTO", "DRY", "ENE", "STDOTH"].contains($0.key) }.map(\.mark)
         #expect(marks.allSatisfy { $0 == .none })
-        // 帯は、航空運送の系列 1 本 + 組の切り分け（旧区分の色）。組の帯は旧区分の範囲を隙間なく覆う。
-        let groupSlices = layout.ribbons.filter { $0.key.hasPrefix("group|") }
-        #expect(layout.ribbons.count == 1 + groupSlices.count)
-        // regroup（旧 3・新 4）は対応が分からないので、色を付けず中立色の 1 本。
-        #expect(groupSlices.count == 1)
-        #expect(groupSlices.allSatisfy { $0.colorIndex == -1 })
-        let oldBars = layout.bars[0].filter { ["BULK", "OTH", "RE"].contains($0.key) }
-        #expect(abs((groupSlices.map(\.leftTop).min() ?? 0) - (oldBars.map(\.y).min() ?? -1)) < 1e-9)
-        #expect(abs((groupSlices.map(\.leftBottom).max() ?? 0) - (oldBars.map { $0.y + $0.height }.max() ?? -1)) < 1e-9)
+        // 最新の列は、大きい順に下から積む。
+        let latest = layout.bars[1].sorted { $0.y > $1.y }
+        #expect(latest.map(\.value) == latest.map(\.value).sorted(by: >))
     }
 
     // 日本郵船 9101（本番 API 2026-11）: FY2025 に split（不定期専用船 → 3 区分）と merge（その他の事業＋不動産 → その他）。

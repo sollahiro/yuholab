@@ -285,16 +285,18 @@ enum StackedLayout {
         }
 
         // 5. 棒と、つなぎ。
-        // 積み上げ順は、最新の列を系列の並びで決め、古い列へは「つながり先の位置」を引き継ぐ。
-        // 系列の並びだけで決めると、再編で分かれた行き先（例: GEM → エナジー・モビリティ）が旧区分と別の位置に積まれ、帯が交差する。
-        // つながり先が無い行（終了）は、これまでどおり上に積む。
+        // 積み上げ順: 最新の列は大きい順に下から積む。古い列は、最新の序列に合わせる
+        // （各行は「つながり先の位置」に積むので、当年で順位が逆転していてもよい）。
+        // つながり先が無い行（終了）は上に積む。同じ位置に重なる行は大きい順。
+        // 旧も新も複数の再編（regroup）は対応が分からないので隣り合わせにしない（垣根を超えた再編は関連付けない）。
         var stacked: [[BreakdownItemInput]] = Array(repeating: [], count: n)
         for k in stride(from: n - 1, through: 0, by: -1) {
+            let bySize = items[k].sorted { ($0.value, $1.key) > ($1.value, $0.key) }
             var slot: [String: Double] = [:]
-            for item in items[k] {
-                let id = seriesIDs[k][item.key] ?? item.key
-                let own = Double(position[id] ?? 0)
-                guard k + 1 < n else { slot[item.key] = own; continue }
+            for (rank, item) in bySize.enumerated() {
+                // 位置の差が付くよう、つながり先の位置を整数、同じ先の中の大きい順を小数で足す。
+                let own = Double(rank) / 1000
+                guard k + 1 < n else { slot[item.key] = Double(rank); continue }
                 let next = stacked[k + 1]
                 var targets: [Int] = []
                 for (index, candidate) in next.enumerated() {
@@ -307,13 +309,12 @@ enum StackedLayout {
                 }
                 // 前年と結べない（break）行も、同じキーの行が次の列にあれば、その位置に積む。
                 if targets.isEmpty, let same = next.firstIndex(where: { $0.key == item.key }) { targets.append(same) }
-                // 位置の差が付くよう、つながり先の位置を整数、同じ先の中の並びを小数で足す。
-                slot[item.key] = targets.min().map { Double($0) + own / 1000 } ?? Double(next.count) + own / 1000
+                slot[item.key] = targets.min().map { Double($0) + own } ?? Double(next.count) + own
             }
             var sorted = items[k].sorted { (slot[$0.key] ?? 0, $0.key) < (slot[$1.key] ?? 0, $1.key) }
-            // 再編の組は、旧区分どうし・新区分どうしを隣り合わせに積む。
-            var clusters = columns[k].groups.map(\.toKeys)
-            if k + 1 < n { clusters += columns[k + 1].groups.map(\.fromKeys) }
+            // 旧 1・新 n（split）、旧 n・新 1（merge）などの組は、旧区分どうし・新区分どうしを隣り合わせに積む。
+            var clusters = columns[k].groups.filter { !$0.isRegroup }.map(\.toKeys)
+            if k + 1 < n { clusters += columns[k + 1].groups.filter { !$0.isRegroup }.map(\.fromKeys) }
             sorted = clustered(sorted, clusters: clusters)
             stacked[k] = sorted
         }
@@ -364,16 +365,9 @@ enum StackedLayout {
                     let leftBottom = source.map { $0.y + $0.height }.max() ?? first.y + first.height
                     let rightTop = target.map(\.y).min() ?? second.y
                     let rightBottom = target.map { $0.y + $0.height }.max() ?? second.y + second.height
-                    // 旧 n・新 m（regroup）は、どの旧区分がどの新区分へ移ったかが分からないので、
-                    // 色を付けず中立色の 1 本の帯で結ぶ（色で対応があるように見せない）。
-                    if group.isRegroup {
-                        ribbons.append(
-                            BreakdownRibbon(
-                                fromColumn: k - 1, key: "group|\(k)|\(index)|0", colorIndex: -1,
-                                leftTop: leftTop, leftBottom: leftBottom, rightTop: rightTop,
-                                rightBottom: rightBottom, leftX: first.x + first.width, rightX: second.x))
-                        continue
-                    }
+                    // 旧 n・新 m（regroup）は、どの旧区分がどの新区分へ移ったかが分からず、積み上げ順も隣り合わせにしない。
+                    // 帯は引かない（垣根を超えた再編は関連付けない）。
+                    if group.isRegroup { continue }
                     // 旧 1 つ・新 n（split）、旧 n・新 1（merge）、1 対 1 は、対応が決まるので旧区分の色（再編先の色にそろえてある）で
                     // 帯を切り分け、左右の高さの比で対応づける。色が前の年から後の年へ途切れずに続く。
                     let orderedSource = source.sorted { $0.y < $1.y }

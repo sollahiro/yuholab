@@ -73,15 +73,14 @@ import Testing
     @Test func ribbonsDoNotCrossAcrossYears() throws {
         let layout = try layout()
         func order(_ column: Int) -> [String] { layout.bars[column].sorted { $0.y > $1.y }.map(\.key) }
-        // 再編の組（GEM・CI → EN・MOB・CI）は両年とも下に隣り合わせで、DS・その他が上に続く。
-        #expect(Set(order(3).prefix(2)) == ["GEM", "CI"])
-        #expect(Set(order(4).prefix(3)) == ["EN", "MOB", "CI"])
-        #expect(order(3).suffix(2) == ["DS", "OTH"])
-        #expect(order(4).suffix(2) == ["DS", "OTH"])
-        // 26/03 の再編は GEM・コネクティブインダストリーズ → エナジー・モビリティ・コネクティブインダストリーズ（有報の前期列と一致）。
-        // コネクティブインダストリーズは「再編」の印を出さず、帯で結ぶ。
+        // 最新は大きい順に下から。古い年は最新の序列に合わせる（GEM・CI は行き先の位置、終了した区分は上）。
+        #expect(order(4) == ["EN", "CI", "DS", "MOB", "OTH"])
+        #expect(order(3) == ["GEM", "CI", "DS", "OTH"])
+        // 26/03 の再編は GEM・コネクティブインダストリーズ → エナジー・モビリティ・コネクティブインダストリーズ（regroup）。
+        // 対応が分からないので帯は引かず、「再編」の印も棒の中には出さない。
         #expect(layout.bars[4].allSatisfy { $0.mark == .none })
-        for column in 0..<4 {
+        #expect(!layout.ribbons.contains { $0.key.hasPrefix("group|") })
+        for column in 0..<3 {
             let ribbons = layout.ribbons.filter { $0.fromColumn == column }.sorted { $0.leftTop < $1.leftTop }
             for (a, b) in zip(ribbons, ribbons.dropFirst()) {
                 #expect(a.rightTop <= b.rightTop + 1e-9, "column \(column): \(a.key) / \(b.key)")
