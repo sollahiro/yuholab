@@ -24,6 +24,8 @@ struct BreakdownItemInput: Equatable {
 struct BreakdownReorgGroup: Equatable {
     var fromKeys: [String]
     var toKeys: [String]
+    /// 旧も新も複数（regroup）。移り先の対応が分からない。
+    var isRegroup: Bool { fromKeys.count > 1 && toKeys.count > 1 }
 }
 
 struct BreakdownColumnInput: Equatable {
@@ -63,22 +65,6 @@ struct BreakdownBar: Equatable, Identifiable {
     var id: String { "\(column)|\(key)" }
 }
 
-/// 棒と棒の間のつなぎ。4 点（左上・右上・右下・左下）。
-struct BreakdownRibbon: Equatable, Identifiable {
-    var fromColumn: Int
-    var key: String
-    /// 負のときは系列の色を持たない（再編の塊のつなぎ）。中立色で描く。
-    var colorIndex: Int
-    var leftTop: Double
-    var leftBottom: Double
-    var rightTop: Double
-    var rightBottom: Double
-    var leftX: Double
-    var rightX: Double
-
-    var id: String { "\(fromColumn)|\(key)" }
-}
-
 struct BreakdownSeries: Equatable, Identifiable {
     var id: String
     var label: String
@@ -91,7 +77,6 @@ struct BreakdownLayout: Equatable {
     /// 各列の棒の中心 x（0...1）。
     var columnCenters: [Double]
     var bars: [[BreakdownBar]]
-    var ribbons: [BreakdownRibbon]
     /// 凡例の並び（積み上げの下から上）。
     var series: [BreakdownSeries]
     /// 合計の文字を置くための上端の余白（0...1）。棒はこの下に収まる。
@@ -106,12 +91,14 @@ let singleSegmentKey = "single|total"
 enum StackedLayout {
     static let barWidthRatio = 0.6
     static let headroom = 0.12
+    /// 系列の色の数（`BreakdownPalette` の色数と同じ）。1 列に最大 9 区分の会社がある。
+    static let paletteSize = 12
 
     static func make(columns: [BreakdownColumnInput]) -> BreakdownLayout {
         let n = columns.count
         guard n > 0 else {
             return BreakdownLayout(
-                columnLabels: [], columnTotals: [], columnCenters: [], bars: [], ribbons: [], series: [],
+                columnLabels: [], columnTotals: [], columnCenters: [], bars: [], series: [],
                 headroom: headroom)
         }
         let items = columns.map { $0.items.filter { $0.value > 0 } }
@@ -188,11 +175,16 @@ enum StackedLayout {
                 palette += 1
             }
         }
-        var colorIndex = position
-        // 再編元（旧区分）は、行き先（新区分）の色にそろえる。新しい年から順に決めて、再編が続いても最新の色になる。
+        // 再編元（旧区分）は、行き先（新区分）の色にそろえる（同じ色の組）。再編が続けば最新の色にそろう。
         // 旧と新の組は大きい順に対応づけ、旧が多いときは最後の新区分に寄せる。
+        var colorParent: [String: String] = Dictionary(uniqueKeysWithValues: ordered.map { ($0.id, $0.id) })
+        func colorRoot(_ id: String) -> String {
+            var root = id
+            while let next = colorParent[root], next != root { root = next }
+            return root
+        }
         for k in stride(from: n - 1, through: 1, by: -1) {
-            for group in columns[k].groups {
+            for group in columns[k].groups where !group.isRegroup {
                 func ids(_ keys: [String], _ column: Int) -> [String] {
                     keys.compactMap { key in
                         items[column].first { $0.key == key }.flatMap { seriesIDs[column][$0.key] }
@@ -205,9 +197,33 @@ enum StackedLayout {
                 let to = ids(group.toKeys, k).sorted { value($0, k) > value($1, k) }
                 guard !to.isEmpty else { continue }
                 for (index, id) in from.enumerated() where position[id] != -1 {
-                    colorIndex[id] = colorIndex[to[min(index, to.count - 1)]] ?? colorIndex[id]
+                    let target = colorRoot(to[min(index, to.count - 1)])
+                    let source = colorRoot(id)
+                    if source != target { colorParent[source] = target }
                 }
             }
+        }
+        // 色の組どうしが同じ列に並ぶときは別の色にする（系列が多い会社でパレットを一周して、同じ棒の中や凡例で色がかぶらないように）。
+        var coexisting: [String: Set<String>] = [:]
+        for k in 0..<n {
+            let roots = Set(items[k].map { colorRoot(seriesIDs[k][$0.key] ?? $0.key) })
+            for root in roots { coexisting[root, default: []].formUnion(roots.subtracting([root])) }
+        }
+        var rootColor: [String: Int] = [:]
+        var colorUse = Array(repeating: 0, count: paletteSize)
+        for seen in ordered where seen.id != singleSegmentKey {
+            let root = colorRoot(seen.id)
+            guard rootColor[root] == nil else { continue }
+            let taken = Set((coexisting[root] ?? []).compactMap { rootColor[$0] })
+            // 空きがあれば最小の番号、無ければ（1 列に paletteSize より多いとき）使用が少ない色。
+            let free = (0..<paletteSize).first { !taken.contains($0) }
+                ?? (0..<paletteSize).min { colorUse[$0] < colorUse[$1] } ?? 0
+            rootColor[root] = free
+            colorUse[free] += 1
+        }
+        var colorIndex: [String: Int] = [:]
+        for seen in ordered {
+            colorIndex[seen.id] = seen.id == singleSegmentKey ? -1 : (rootColor[colorRoot(seen.id)] ?? 0)
         }
         let series = ordered.map {
             BreakdownSeries(id: $0.id, label: $0.label, colorIndex: colorIndex[$0.id] ?? 0)
@@ -252,19 +268,44 @@ enum StackedLayout {
         }
 
         // 5. 棒と、つなぎ。
+        // 積み上げ順: 最新の列は大きい順に下から積む。古い列は、最新の序列に合わせる
+        // （各行は「つながり先の位置」に積むので、当年で順位が逆転していてもよい）。
+        // つながり先が無い行（終了）は上に積む。同じ位置に重なる行は大きい順。
+        // 旧も新も複数の再編（regroup）は対応が分からないので隣り合わせにしない（垣根を超えた再編は関連付けない）。
+        var stacked: [[BreakdownItemInput]] = Array(repeating: [], count: n)
+        for k in stride(from: n - 1, through: 0, by: -1) {
+            let bySize = items[k].sorted { ($0.value, $1.key) > ($1.value, $0.key) }
+            var slot: [String: Double] = [:]
+            for (rank, item) in bySize.enumerated() {
+                // 位置の差が付くよう、つながり先の位置を整数、同じ先の中の大きい順を小数で足す。
+                let own = Double(rank) / 1000
+                guard k + 1 < n else { slot[item.key] = Double(rank); continue }
+                let next = stacked[k + 1]
+                var targets: [Int] = []
+                for (index, candidate) in next.enumerated() {
+                    if case .connect(let from) = candidate.link, from == item.key { targets.append(index) }
+                }
+                for group in columns[k + 1].groups where group.fromKeys.contains(item.key) {
+                    for (index, candidate) in next.enumerated() where group.toKeys.contains(candidate.key) {
+                        targets.append(index)
+                    }
+                }
+                // 前年と結べない（break）行も、同じキーの行が次の列にあれば、その位置に積む。
+                if targets.isEmpty, let same = next.firstIndex(where: { $0.key == item.key }) { targets.append(same) }
+                slot[item.key] = targets.min().map { Double($0) + own } ?? Double(next.count) + own
+            }
+            var sorted = items[k].sorted { (slot[$0.key] ?? 0, $0.key) < (slot[$1.key] ?? 0, $1.key) }
+            // 旧 1・新 n（split）、旧 n・新 1（merge）などの組は、旧区分どうし・新区分どうしを隣り合わせに積む。
+            var clusters = columns[k].groups.filter { !$0.isRegroup }.map(\.toKeys)
+            if k + 1 < n { clusters += columns[k + 1].groups.filter { !$0.isRegroup }.map(\.fromKeys) }
+            sorted = clustered(sorted, clusters: clusters)
+            stacked[k] = sorted
+        }
         var bars: [[BreakdownBar]] = []
         for k in 0..<n {
             var cumulative = 0.0
             var column: [BreakdownBar] = []
-            var sorted = items[k].sorted {
-                let a = position[seriesIDs[k][$0.key] ?? $0.key] ?? 0
-                let b = position[seriesIDs[k][$1.key] ?? $1.key] ?? 0
-                return a < b
-            }
-            // 再編の組は、旧区分どうし・新区分どうしを隣り合わせに積む。
-            var clusters = columns[k].groups.map(\.toKeys)
-            if k + 1 < n { clusters += columns[k + 1].groups.map(\.fromKeys) }
-            sorted = clustered(sorted, clusters: clusters)
+            let sorted = stacked[k]
             for item in sorted {
                 let height = item.value * scale
                 cumulative += height
@@ -279,69 +320,12 @@ enum StackedLayout {
             bars.append(column)
         }
 
-        var ribbons: [BreakdownRibbon] = []
-        if n > 1 {
-            for k in 1..<n {
-                for item in items[k] {
-                    guard case .connect(let from) = item.link,
-                        let source = bars[k - 1].first(where: { $0.key == from }),
-                        let target = bars[k].first(where: { $0.key == item.key })
-                    else { continue }
-                    ribbons.append(
-                        BreakdownRibbon(
-                            fromColumn: k - 1, key: item.key, colorIndex: target.colorIndex,
-                            leftTop: source.y, leftBottom: source.y + source.height,
-                            rightTop: target.y, rightBottom: target.y + target.height,
-                            leftX: source.x + source.width, rightX: target.x))
-                }
-            }
-        }
-
-        if n > 1 {
-            for k in 1..<n {
-                for (index, group) in columns[k].groups.enumerated() {
-                    let source = bars[k - 1].filter { group.fromKeys.contains($0.key) }
-                    let target = bars[k].filter { group.toKeys.contains($0.key) }
-                    guard let first = source.first, let second = target.first else { continue }
-                    let leftTop = source.map(\.y).min() ?? first.y
-                    let leftBottom = source.map { $0.y + $0.height }.max() ?? first.y + first.height
-                    let rightTop = target.map(\.y).min() ?? second.y
-                    let rightBottom = target.map { $0.y + $0.height }.max() ?? second.y + second.height
-                    // 塊のつなぎは、旧区分の色（再編先の色にそろえてある）で帯を切り分け、
-                    // 左右の高さの比で対応づける。色が前の年から後の年へ途切れずに続く。
-                    let orderedSource = source.sorted { $0.y < $1.y }
-                    let orderedTarget = target.sorted { $0.y < $1.y }
-                    // 上から数えた各棒の下端の位置（0〜1）。
-                    func edges(_ bars: [BreakdownBar], top: Double, bottom: Double) -> [Double] {
-                        let span = bottom - top
-                        guard span > 0 else { return [1] }
-                        return bars.map { min(max(($0.y + $0.height - top) / span, 0), 1) }
-                    }
-                    let sourceEdges = edges(orderedSource, top: leftTop, bottom: leftBottom)
-                    var cuts = Set([0.0, 1.0])
-                    cuts.formUnion(sourceEdges)
-                    cuts.formUnion(edges(orderedTarget, top: rightTop, bottom: rightBottom))
-                    let sortedCuts = cuts.sorted()
-                    for (slice, pair) in zip(sortedCuts, sortedCuts.dropFirst()).enumerated() where pair.1 - pair.0 > 1e-9 {
-                        let mid = (pair.0 + pair.1) / 2
-                        let barIndex = sourceEdges.firstIndex { mid <= $0 } ?? max(orderedSource.count - 1, 0)
-                        let color = orderedSource[min(barIndex, orderedSource.count - 1)].colorIndex
-                        ribbons.append(
-                            BreakdownRibbon(
-                                fromColumn: k - 1, key: "group|\(k)|\(index)|\(slice)", colorIndex: color,
-                                leftTop: leftTop + (leftBottom - leftTop) * pair.0,
-                                leftBottom: leftTop + (leftBottom - leftTop) * pair.1,
-                                rightTop: rightTop + (rightBottom - rightTop) * pair.0,
-                                rightBottom: rightTop + (rightBottom - rightTop) * pair.1,
-                                leftX: first.x + first.width, rightX: second.x))
-                    }
-                }
-            }
-        }
+        // 再編の組（split / merge / regroup）は帯を引かない。積み上げ順だけで位置をそろえる
+        // （対応が決まる組は隣り合わせに積み、regroup は関連付けない）。
 
         return BreakdownLayout(
             columnLabels: columns.map(\.label), columnTotals: totals, columnCenters: centers,
-            bars: bars, ribbons: ribbons, series: series, headroom: headroom,
+            bars: bars, series: series, headroom: headroom,
             columnReorged: columns.map(\.reorged))
     }
 

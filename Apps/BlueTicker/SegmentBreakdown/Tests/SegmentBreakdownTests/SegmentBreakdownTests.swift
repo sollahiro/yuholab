@@ -48,8 +48,6 @@ import Testing
         #expect(["P", "M", "A"].allSatisfy { key in before.first { $0.key == key }?.mark == .reorg })
         #expect(before.first { $0.key == "L" }?.mark == BreakdownMark.none)
         // つなぎは L / R だけ（FY24→25 で 5 本、FY25→26 で 2 本）。食品へは出さない。
-        #expect(layout.ribbons.filter { $0.fromColumn == 1 }.map(\.key).sorted() == ["L", "R"])
-        #expect(layout.ribbons.filter { $0.fromColumn == 0 }.count == 5)
     }
 
     @Test func stackingFitsUnderHeadroomAndStartsAtBottom() throws {
@@ -85,10 +83,9 @@ import Testing
         #expect(layout.bars[0].first { $0.key == "F" }?.mark == .ended)
         #expect(layout.bars[0].first { $0.key == "G" }?.mark == BreakdownMark.none)
         #expect(layout.series.map(\.label) == ["ゲーム", "音楽", "金融"])
-        #expect(layout.ribbons.count == 2)
     }
 
-    @Test func renamedSeriesKeepsColorAndRibbon() throws {
+    @Test func renamedSeriesKeepsColor() throws {
         let json = """
             {"years":[
              {"fiscal_year":2026,"segments":[
@@ -98,7 +95,6 @@ import Testing
         let layout = StackedLayout.make(columns: try columns(json))
         #expect(layout.series.count == 1)
         #expect(layout.bars[0][0].colorIndex == layout.bars[1][0].colorIndex)
-        #expect(layout.ribbons.count == 1)
         #expect(layout.bars[1][0].mark == BreakdownMark.none)
     }
 
@@ -158,7 +154,6 @@ import Testing
             BreakdownColumnInput(label: "FY2026", items: [BreakdownItemInput(key: "a", label: "A", value: 1, link: .none)])
         ])
         #expect(single.bars.count == 1)
-        #expect(single.ribbons.isEmpty)
         #expect(single.bars[0][0].mark == BreakdownMark.none)
     }
 
@@ -178,7 +173,6 @@ import Testing
         // 組替・終了の印は残らず、リボンは 3 系列 × 2 区間。
         #expect(layout.bars.joined().allSatisfy { $0.mark == BreakdownMark.none || $0.mark == .new })
         #expect(!layout.bars.joined().contains { $0.mark == .reorg || $0.mark == .ended })
-        #expect(layout.ribbons.count == 6)
         // 最新期の前年比は合算した前年に対して出る。
         let rows = BreakdownSummary.segmentRows(columns: cols, layout: layout, profitByKey: [:])
         let food = try #require(rows.first { $0.key == "F" })
@@ -234,32 +228,20 @@ import Testing
           {"label":"不動産業","segment_key":"RE","value":3}]}]}
         """
 
-    @Test func regroupIsStackedAdjacentAndJoinedByOneNeutralRibbon() throws {
+    @Test func regroupIsNotClusteredNorJoinedAndLatestColumnIsLargestFirst() throws {
         let cols = BreakdownBuilder.collapsingReorgs(try columns(nykJSON))
         // regroup は 1 本に集約しない（旧 3・新 4）。
         #expect(cols[0].items.count == 4)
         #expect(cols[1].groups == [BreakdownReorgGroup(
             fromKeys: ["BULK", "OTH", "RE"], toKeys: ["AUTO", "DRY", "ENE", "STDOTH"])])
         let layout = StackedLayout.make(columns: cols)
-
-        func positions(_ column: Int, _ keys: Set<String>) -> [Int] {
-            layout.bars[column].enumerated().filter { keys.contains($0.element.key) }.map(\.offset)
-        }
-        for (column, keys) in [(0, Set(["BULK", "OTH", "RE"])), (1, Set(["AUTO", "DRY", "ENE", "STDOTH"]))] {
-            let p = positions(column, keys)
-            #expect(p.count == keys.count)
-            #expect(p == Array((p.first ?? 0)..<((p.first ?? 0) + p.count)))
-        }
+        // 旧も新も複数（regroup）は対応が分からないので、帯を引かない（航空運送の系列だけ）。
         // 組の行に「再編」「終了」の印は出ない。
         let marks = layout.bars.joined().filter { ["BULK", "OTH", "RE", "AUTO", "DRY", "ENE", "STDOTH"].contains($0.key) }.map(\.mark)
         #expect(marks.allSatisfy { $0 == .none })
-        // 帯は、航空運送の系列 1 本 + 組の切り分け（旧区分の色）。組の帯は旧区分の範囲を隙間なく覆う。
-        let groupSlices = layout.ribbons.filter { $0.key.hasPrefix("group|") }
-        #expect(layout.ribbons.count == 1 + groupSlices.count)
-        #expect(groupSlices.allSatisfy { $0.colorIndex >= 0 })
-        let oldBars = layout.bars[0].filter { ["BULK", "OTH", "RE"].contains($0.key) }
-        #expect(abs((groupSlices.map(\.leftTop).min() ?? 0) - (oldBars.map(\.y).min() ?? -1)) < 1e-9)
-        #expect(abs((groupSlices.map(\.leftBottom).max() ?? 0) - (oldBars.map { $0.y + $0.height }.max() ?? -1)) < 1e-9)
+        // 最新の列は、大きい順に下から積む。
+        let latest = layout.bars[1].sorted { $0.y > $1.y }
+        #expect(latest.map(\.value) == latest.map(\.value).sorted(by: >))
     }
 
     // 日本郵船 9101（本番 API 2026-11）: FY2025 に split（不定期専用船 → 3 区分）と merge（その他の事業＋不動産 → その他）。
@@ -389,8 +371,8 @@ import Testing
         #expect(Set(layout.bars.joined().map(\.colorIndex)).count == 3)
     }
 
-    // メディア工房 3815: 旧 4 区分 → 新 2 区分の regroup。大きい順に対応づけ、余りは最後の新区分の色。
-    @Test func regroupSourcesAreColoredByRankAndExtrasFollowTheLastDescendant() throws {
+    // メディア工房 3815: 旧 3 区分 → 新 2 区分の regroup。対応が分からないので、旧区分の色を新区分にそろえない。
+    @Test func regroupSourcesKeepTheirOwnColorsBecauseTheMappingIsUnknown() throws {
         let json = """
             {"years":[
              {"fiscal_year":2024,"line_cut":true,"segments":[
@@ -405,9 +387,9 @@ import Testing
             """
         let layout = StackedLayout.make(columns: try columns(json))
         func color(_ column: Int, _ key: String) -> Int? { layout.bars[column].first { $0.key == key }?.colorIndex }
-        #expect(color(0, "DC") == color(1, "FT"))
-        #expect(color(0, "O2O") == color(1, "ENT"))
-        #expect(color(0, "SNS") == color(1, "ENT"))
+        // 同じ列の中では別の色（旧と新の対応は付けない）。
+        #expect(Set(["DC", "O2O", "SNS"].compactMap { color(0, $0) }).count == 3)
+        #expect(Set(["ENT", "FT"].compactMap { color(1, $0) }).count == 2)
     }
 
     // さいか屋 8254: 過去 2 年は報告セグメントが無い（連結合計だけ）。単一セグメントの棒にし、前年とはつながない。
@@ -433,6 +415,5 @@ import Testing
         // 単一→複数の年は、つながない。「再編」を出す。
         #expect(layout.bars[2].allSatisfy { $0.colorIndex >= 0 })
         #expect(layout.columnReorged == [false, false, true, false])
-        #expect(layout.ribbons.allSatisfy { $0.fromColumn == 2 })
     }
 }
