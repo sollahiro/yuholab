@@ -393,7 +393,7 @@ enum BreakdownPalette {
         case .reorg: return "再編"
         // 「新規」「終了」は断定しない（地域名の表記ゆれや再編で出がち）ので棒の中には出さない。
         case .new, .ended: return nil
-        case .single: return "単一セグメント"
+        case .single: return "単一"
         }
     }
 }
