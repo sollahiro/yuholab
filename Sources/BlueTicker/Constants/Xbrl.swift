@@ -1337,13 +1337,18 @@ enum Xbrl {
     ]
     static let geographyHeadingKeywords: [String] = [
         "地域ごとの情報",
+        "地域に関する情報",
         "地域別",
         "所在地別",
     ]
     /// 地域別売上の開示が「注記22. 売上高」等の収益分解へ省略されている会社向け
     /// （日本精工: InformationAboutGeographicalAreas は非流動資産のみ。収益の分解に地域×事業マトリクス）。
+    /// 地域欄が収益注記の参照で済まされている IFRS の会社（7012 / 5101 / 6506 / 5016 / JFE 5411）の
+    /// 収益注記（地域×事業の表）も対象にする。
     static let geographyRevenueDecompositionTextBlockTags: Set<String> = [
         "NotesNetSalesConsolidatedFinancialStatementsIFRSTextBlock",
+        "NotesRevenueConsolidatedFinancialStatementsIFRSTextBlock",
+        "NotesRevenue2ConsolidatedFinancialStatementsIFRSTextBlock",
     ]
     static let geographyRevenueDecompositionHeading = "収益の分解"
     static let geographyDimensionKeywords: [String] = [

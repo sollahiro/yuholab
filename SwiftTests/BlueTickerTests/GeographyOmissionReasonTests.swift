@@ -296,6 +296,29 @@ import Testing
         #expect(!BreakdownExtractor.isNumberedFootnoteLine("２．地域ごとの情報"))
     }
 
+    /// source: code=7508 S100YI5T（句点が無いまま段落が2つに分かれた「90％超」の省略文）
+    @Test func domesticDominantSentenceSplitAcrossParagraphs() {
+        let sentences = [
+            "本邦の売上高及び資産の金額は、全セグメントの売上高の合計及び資産の金額の合計に占める割合",
+            "　がいずれも 90％超であるため、地域ごとの情報の記載を省略しております。",
+        ]
+        #expect(BreakdownExtractor.classifyGeographyOmission(sentences: sentences)
+            == breakdownNotApplicableDomesticDominant90pct)
+        // 句点で終わる文はつなげない。
+        #expect(BreakdownExtractor.classifyGeographyOmission(sentences: [
+            "本邦の売上高及び資産の金額は、全セグメントの売上高の合計に占める割合。",
+            "がいずれも 90％超であるため、記載を省略しております。",
+        ]) == nil)
+    }
+
+    @Test func regionRelatedInformationHeadingIsGeographyKeyword() {
+        #expect(Xbrl.geographyHeadingKeywords.contains("地域に関する情報"))
+        #expect(Xbrl.geographyRevenueDecompositionTextBlockTags.contains(
+            "NotesRevenue2ConsolidatedFinancialStatementsIFRSTextBlock"))
+        #expect(Xbrl.geographyRevenueDecompositionTextBlockTags.contains(
+            "NotesRevenueConsolidatedFinancialStatementsIFRSTextBlock"))
+    }
+
     // MARK: 前の表の脚注が、後続の売上表（当期）を資産表として落とさない
 
     /// source: code=6754 アンリツ doc_id=S100YH5E 地域別に関する情報（前期表・脚注・当期表の並び）

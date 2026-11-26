@@ -310,10 +310,12 @@ extension BreakdownLoadResult {
             #expect(isProtectedBreakdownRow(existingSource: breakdownSourceGeographyLLM, newNotApplicableReason: reason))
             #expect(isProtectedBreakdownRow(existingSource: breakdownSourceXbrlFacts, newNotApplicableReason: reason))
         }
-        // same_as を一時的な理由（unknown / not_found）で上書きしない。
-        for reason in [breakdownNotApplicableUnknown, breakdownNotApplicableNotFound] {
-            #expect(isProtectedBreakdownRow(existingSource: breakdownSourceSameAs, newNotApplicableReason: reason))
-        }
+        // 地域の開示が無い（単一セグメントの 9376 など）も、決定論なので古い same_as を更新できる。
+        #expect(!isProtectedBreakdownRow(
+            existingSource: breakdownSourceSameAs, newNotApplicableReason: breakdownNotApplicableNotFound))
+        // same_as を unknown（要調査・再試行）で上書きしない。
+        #expect(isProtectedBreakdownRow(
+            existingSource: breakdownSourceSameAs, newNotApplicableReason: breakdownNotApplicableUnknown))
         // not_applicable 同士は従来どおり置き換える。
         #expect(!isProtectedBreakdownRow(
             existingSource: breakdownSourceNotApplicable, newNotApplicableReason: breakdownNotApplicableUnknown))
