@@ -1365,9 +1365,11 @@ enum BreakdownExtractor {
             // 収益の分解（行=地域・列=事業）にある型（ダイキン 6367 S100OG1V〜S100YFQL）。
             let jgaapTables = jgaapSegmentNoteGeographyTables(xbrlDir: xbrlDir)
             if !jgaapTables.isEmpty {
-                return buildResult(
+                let jgaapResult = buildResult(
                     xbrlDir: xbrlDir, tables: jgaapTables,
                     dimensionKeywords: Xbrl.geographyDimensionKeywords)
+                // 前期の表しか拾えないときは採用しない（従来の same_as 経路に戻す）。
+                if !geographyTablesAreAllPriorPeriod(jgaapResult) { return jgaapResult }
             }
         }
         return result
@@ -1405,6 +1407,7 @@ enum BreakdownExtractor {
     }
 
     /// 列見出しに「連結財務諸表計上額」（連結計上額）がある表は、行ラベルの列とその列だけにする。
+    /// 無い表は、見出しが「計」「合計」の列が2つ以上あるとき、最も右の列だけにする。
     /// 事業別の列（計・その他・合計・調整額）を残すと、列選択が「その他」事業を含まない「計」を選び、
     /// 警告なしで地域別の数字が少なく保存されるため（ダイキン S100W3XO: 「計」を選ぶと合計が97.8%）。
     /// 該当する列が無い、または見出し行が複数の列に当たる表は、そのまま返す。
@@ -1421,6 +1424,20 @@ enum BreakdownExtractor {
                 break
             }
             if hits.count > 1 { return markdown }
+        }
+        if columnIndex == nil {
+            // 連結計上額の列が無い表（積水化学 S100YBAY: 「計」が報告セグメント小計と総合計の2列）は、
+            // 見出しが「計」「合計」の列のうち最も右の列（総合計）だけにする。
+            for row in grid.prefix(3) {
+                let totals = row.indices.dropFirst().filter { index in
+                    let compact = row[index].filter { !$0.isWhitespace }
+                    return compact == "計" || compact == "合計"
+                }
+                if totals.count >= 2, let last = totals.last {
+                    columnIndex = last
+                    break
+                }
+            }
         }
         guard let columnIndex else { return markdown }
         let narrowed = grid.map { row in
@@ -3078,7 +3095,11 @@ enum BreakdownExtractor {
 
     /// 「（注4）…」「(注１)…」のように注番号つきで始まる脚注行。
     static func isNumberedFootnoteLine(_ text: String) -> Bool {
-        text.range(of: #"^[（(]注[0-9０-９]*[）)]"#, options: .regularExpression) != nil
+        if text.range(of: #"^[（(]注[0-9０-９]*[）)]"#, options: .regularExpression) != nil { return true }
+        // 「４．減価償却費、有形固定資産及び無形固定資産の増加額には、…」（イトーキ S100XRIU）のように、
+        // 番号だけで始まる長い脚注文。「２．有形固定資産」のような短い見出しは脚注にしない。
+        return text.range(of: #"^[0-9０-９]+[．.]"#, options: .regularExpression) != nil
+            && text.count >= 24 && text.contains("には")
     }
 
     static func isGeographyAssetMetricCaption(_ text: String) -> Bool {

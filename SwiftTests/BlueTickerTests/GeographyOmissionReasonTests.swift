@@ -273,6 +273,29 @@ import Testing
         #expect(BreakdownExtractor.keepingConsolidatedColumn(plain) == plain)
     }
 
+    /// source: code=4204 積水化学 doc_id=S100YBAY（「計」が報告セグメント小計と総合計の2列）
+    @Test func rightmostTotalColumnIsKeptWhenNoConsolidatedColumn() {
+        let markdown = """
+            | | 住宅 | 環境 | 計 | その他 | 調整額 | 計 |
+            | --- | --- | --- | --- | --- | --- | --- |
+            | 日本 | 500,000 | 300,000 | 800,000 | 88,981 | 2,476 | 891,457 |
+            | 北米 | 100,000 | 40,000 | 140,000 | 3,000 | 737 | 143,737 |
+            """
+        let narrowed = BreakdownExtractor.keepingConsolidatedColumn(markdown)
+        #expect(narrowed.contains("891,457"))
+        #expect(narrowed.contains("143,737"))
+        #expect(!narrowed.contains("800,000"))
+        #expect(!narrowed.contains("住宅"))
+    }
+
+    /// source: code=7972 イトーキ doc_id=S100XRIU（表の直前の「４．…増加額には、…」は脚注）
+    @Test func numberedProseFootnoteIsNotAnAssetCaption() {
+        #expect(BreakdownExtractor.isNumberedFootnoteLine(
+            "４．減価償却費、有形固定資産及び無形固定資産の増加額には、長期前払費用とその償却額が含まれております。"))
+        #expect(!BreakdownExtractor.isNumberedFootnoteLine("２．有形固定資産"))
+        #expect(!BreakdownExtractor.isNumberedFootnoteLine("２．地域ごとの情報"))
+    }
+
     // MARK: 前の表の脚注が、後続の売上表（当期）を資産表として落とさない
 
     /// source: code=6754 アンリツ doc_id=S100YH5E 地域別に関する情報（前期表・脚注・当期表の並び）
