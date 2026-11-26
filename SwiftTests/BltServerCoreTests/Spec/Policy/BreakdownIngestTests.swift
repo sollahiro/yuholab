@@ -302,6 +302,23 @@ extension BreakdownLoadResult {
         }
     }
 
+    /// クラフティア 1959: 製品の見出しの下の「同様の情報を開示」を地域の省略と取り違えた古い same_as 行は、
+    /// 地域の見出しの下で確かめた本邦90%超・海外売上なしの省略で更新できる。実データ行は守る。
+    @Test func staleSameAsRowIsReplacedByDeterministicOmissionButRealDataIsKept() {
+        for reason in [breakdownNotApplicableDomesticDominant90pct, breakdownNotApplicableNoOverseasSales] {
+            #expect(!isProtectedBreakdownRow(existingSource: breakdownSourceSameAs, newNotApplicableReason: reason))
+            #expect(isProtectedBreakdownRow(existingSource: breakdownSourceGeographyLLM, newNotApplicableReason: reason))
+            #expect(isProtectedBreakdownRow(existingSource: breakdownSourceXbrlFacts, newNotApplicableReason: reason))
+        }
+        // same_as を一時的な理由（unknown / not_found）で上書きしない。
+        for reason in [breakdownNotApplicableUnknown, breakdownNotApplicableNotFound] {
+            #expect(isProtectedBreakdownRow(existingSource: breakdownSourceSameAs, newNotApplicableReason: reason))
+        }
+        // not_applicable 同士は従来どおり置き換える。
+        #expect(!isProtectedBreakdownRow(
+            existingSource: breakdownSourceNotApplicable, newNotApplicableReason: breakdownNotApplicableUnknown))
+    }
+
     /// 実データ（`.resolved`）で再解決された行は、以前 notApplicable プレースホルダだった場合でも
     /// `notApplicableReason` が nil へ戻ること（`applyFields` が毎回無条件で設定するため desync しない）。
     @Test func ingestClearsNotApplicableReasonWhenLaterResolved() async throws {
