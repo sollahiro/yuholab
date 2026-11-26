@@ -219,6 +219,20 @@ import Testing
         #expect(headedSameAs(["１．製品及びサービスごとの情報", sentence]) == sentence)
     }
 
+    // MARK: 地域の表が前期のものだけのとき（ダイキン S100OG1V）
+
+    @Test func priorPeriodOnlyGeographyTablesAreDetected() {
+        let prior = BreakdownTable(heading: "地域ごとの情報", markdown: "| 日本 | 100 |", period: "前期")
+        let current = BreakdownTable(heading: "地域ごとの情報", markdown: "| 日本 | 110 |", period: "当期")
+        func extracted(_ tables: [BreakdownTable]) -> ExtractedBreakdown {
+            ExtractedBreakdown(method: tables.isEmpty ? "not_found" : "html_table", tables: tables, facts: [])
+        }
+        #expect(BreakdownExtractor.geographyTablesAreAllPriorPeriod(extracted([prior])))
+        #expect(!BreakdownExtractor.geographyTablesAreAllPriorPeriod(extracted([prior, current])))
+        #expect(!BreakdownExtractor.geographyTablesAreAllPriorPeriod(extracted([current])))
+        #expect(!BreakdownExtractor.geographyTablesAreAllPriorPeriod(extracted([])))
+    }
+
     // MARK: 前の表の脚注が、後続の売上表（当期）を資産表として落とさない
 
     /// source: code=6754 アンリツ doc_id=S100YH5E 地域別に関する情報（前期表・脚注・当期表の並び）

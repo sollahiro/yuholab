@@ -1344,7 +1344,7 @@ enum BreakdownExtractor {
         // 地域注記・報告セグメントのどちらからも取れないときだけ、IFRS セグメント注記を
         // 見出し型一致で走査する（資産表は見出しの除外語と直近の指標キャプションで落とし、
         // 地域ラベル行のある表に限る。テクマトリックス S100YL8T は売上省略＋非流動資産表のみ）。
-        if result.method == "not_found" {
+        if result.method == "not_found" || geographyTablesAreAllPriorPeriod(result) {
             let segmentNoteTables = extractFromTextBlocks(
                 xbrlDir: xbrlDir,
                 dedicatedTags: [],
@@ -1361,8 +1361,43 @@ enum BreakdownExtractor {
                     xbrlDir: xbrlDir, tables: segmentNoteTables,
                     dimensionKeywords: Xbrl.geographyDimensionKeywords)
             }
+            // J-GAAP で地域専用の注記が「セグメント情報に同様」と省略し、地域別の売上がセグメント注記の
+            // 収益の分解（行=地域・列=事業）にある型（ダイキン 6367 S100OG1V〜S100YFQL）。
+            let jgaapTables = jgaapSegmentNoteGeographyTables(xbrlDir: xbrlDir)
+            if !jgaapTables.isEmpty {
+                return buildResult(
+                    xbrlDir: xbrlDir, tables: jgaapTables,
+                    dimensionKeywords: Xbrl.geographyDimensionKeywords)
+            }
         }
         return result
+    }
+
+    /// 地域の表が前期のものだけで、当期の表が無い（ダイキン S100OG1V: 前期の比較表だけが残る）。
+    static func geographyTablesAreAllPriorPeriod(_ result: ExtractedBreakdown) -> Bool {
+        !result.tables.isEmpty
+            && result.tables.allSatisfy { $0.period == "前期" && !htmlTableHasCurrentPeriodRow($0) }
+    }
+
+    /// 地域専用の注記が省略されているとき、J-GAAP セグメント注記の収益の分解表（行が地域名）を候補にする。
+    /// 地域専用の注記がある書類に限る。報告セグメントが地域別の会社は、その表がセグメントそのもの
+    /// （same_as: segment）なので使わない。
+    static func jgaapSegmentNoteGeographyTables(xbrlDir: URL) -> [BreakdownTable] {
+        guard hasDedicatedGeographyTextBlock(xbrlDir: xbrlDir) else { return [] }
+        let members = SegmentBreakdownResolver.currentSegmentMembers(
+            in: extractReportableSegmentInfo(xbrlDir: xbrlDir).facts)
+        if !members.isEmpty, BreakdownNormalizer.allMembersAreGeography(members) { return [] }
+        return extractFromTextBlocks(
+            xbrlDir: xbrlDir,
+            dedicatedTags: [],
+            mixedTags: Xbrl.jgaapSegmentNoteGeographyFallbackTextBlockTags,
+            dedicatedHeading: "地域ごとの情報",
+            mixedKeywords: Xbrl.jgaapSegmentNoteGeographyFallbackHeadingKeywords,
+            skipGeographyAssetMetricTables: true,
+            mixedHeadingLikeOnly: true,
+            dropOfWhichRegionColumns: true,
+            mixedSkipNearestAssetCaptionTables: true
+        ).filter(tableHasGeographyRegionLabels)
     }
 
     /// markdown 表のデータ行先頭セル（行ラベル）に地域名キーワードが十分あるか。
