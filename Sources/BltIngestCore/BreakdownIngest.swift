@@ -282,10 +282,12 @@ func runBreakdownIngest(
 
 /// notApplicable の解決結果で既存行を上書きしてはいけないか。
 /// 実データ行（source が not_applicable でも same_as でもない）は守る。
-/// same_as は数字を持たない省略の行なので、本邦90%超・海外売上なしの決定論の省略（地域の見出しの下の文で確かめた
-/// 理由）で更新できる。製品の見出しの下の「同様の情報を開示」を取り違えた古い same_as（クラフティア 1959）を直すため。
+/// same_as は数字を持たない省略の行なので、決定論の省略（本邦90%超・海外売上なし）で更新できる。
+/// 製品の見出しの下の「同様の情報を開示」を取り違えた古い same_as（クラフティア 1959、単一セグメントの 9376）を直すため。
+/// unknown（要調査・再試行）では上書きしない。
 func isProtectedBreakdownRow(existingSource: String, newNotApplicableReason reason: String) -> Bool {
     if existingSource == breakdownSourceNotApplicable { return false }
+    // not_found は含めない。正当な same_as を一時的な抽出失敗の not_found で潰さないため。
     if existingSource == breakdownSourceSameAs,
         reason == breakdownNotApplicableDomesticDominant90pct
             || reason == breakdownNotApplicableNoOverseasSales

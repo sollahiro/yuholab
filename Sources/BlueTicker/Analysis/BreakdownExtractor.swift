@@ -1072,7 +1072,12 @@ enum BreakdownExtractor {
         func matches(_ regex: NSRegularExpression, _ text: String) -> Bool {
             regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
         }
-        let normalized = sentences.map { $0.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "　", with: "") }
+        var normalized = sentences.map { $0.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "　", with: "") }
+        // 句点が無いまま段落が分かれた文（7508 S100YI5T:「…に占める割合」／「がいずれも90％超であるため…」）は、
+        // 隣の文とつなげた形でも照合する。
+        for index in normalized.indices.dropLast() where !normalized[index].hasSuffix("。") {
+            normalized.append(normalized[index] + normalized[index + 1])
+        }
         if normalized.contains(where: { s in geographyNoOverseasSalesPatterns.contains { matches($0, s) } }) {
             return breakdownNotApplicableNoOverseasSales
         }
