@@ -2104,6 +2104,7 @@ import Testing
         #expect(segmentLabels(snapshot) == ["日本", "海外"])
     }
 
+    /// source: code=5016 fy_end=2026-03-31 doc_id=S100YINW page=0 field=geography 当連結会計年度 日本573,194 中国62,486 台湾70,062 他アジア82,471 米国66,909 その他29,516 合計884,638（百万円）。page は未記録（XBRL の表から取得）。同型 S100W549 は合計714,940。
     /// 5016 JX金属: 行=地域（行ラベルが2列: アジア/中国…）、列=事業＋合計。
     /// 行ラベル列の見出し「地域」と事業列の「その他」を地域列と数えて転置し、事業名の行を作っていた。
     @Test func twoLevelRowLabelsWithBusinessColumnsKeepRegionRows() async throws {
