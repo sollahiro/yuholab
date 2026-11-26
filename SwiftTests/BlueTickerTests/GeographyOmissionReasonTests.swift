@@ -350,4 +350,33 @@ import Testing
         #expect(!BreakdownExtractor.isNumberedFootnoteLine("所在地別の非流動資産（注4）"))
         #expect(!BreakdownExtractor.isNumberedFootnoteLine("売上収益及び非流動資産の地域別内訳"))
     }
+
+    /// source: code=4324 doc_id=S100QHOJ fy_end=2022-12-31（収益の注記。「主要なサービス」の節の後に「地域市場別内訳」の節、列は事業・小計・内部取引調整・合計）
+    @Test func regionMarketSectionIsNarrowedToSubtotalColumn() {
+        let markdown = """
+            | 当連結会計年度 | 当連結会計年度 | 当連結会計年度 | 当連結会計年度 | （単位：百万円） | （単位：百万円） |
+            | --- | --- | --- | --- | --- | --- |
+            | | セグメント | セグメント | セグメント | 内部取引調整 | 合計 |
+            | | 国内事業 | 海外事業 | 小計 | 内部取引調整 | 合計 |
+            | 主要なサービス | | | | | |
+            | 広告業 | 421,126 | 714,948 | 1,136,075 | － | － |
+            | 合計 | 530,133 | 714,948 | 1,245,082 | △1,198 | 1,243,883 |
+            | 地域市場別内訳 | | | | | |
+            | 日本 | 530,133 | － | 530,133 | － | － |
+            | EMEA（欧州・中東・アフリカ） | － | 275,411 | 275,411 | － | － |
+            | Americas（米州） | － | 324,013 | 324,013 | － | － |
+            | APAC（アジア太平洋） | － | 115,523 | 115,523 | － | － |
+            | 合計 | 530,133 | 714,948 | 1,245,082 | △1,198 | 1,243,883 |
+            """
+        let narrowed = BreakdownExtractor.narrowingToRegionMarketSection(markdown)
+        #expect(narrowed.contains("日本"))
+        #expect(narrowed.contains("275,411"))
+        #expect(narrowed.contains("1,245,082"))
+        #expect(!narrowed.contains("海外事業"))
+        #expect(!narrowed.contains("広告業"))
+        #expect(!narrowed.contains("1,243,883"))
+        // 地域の節が無い表はそのまま。
+        let plain = "| | 小計 |\n| --- | --- |\n| 日本 | 100 |\n| 合計 | 100 |"
+        #expect(BreakdownExtractor.narrowingToRegionMarketSection(plain) == plain)
+    }
 }
