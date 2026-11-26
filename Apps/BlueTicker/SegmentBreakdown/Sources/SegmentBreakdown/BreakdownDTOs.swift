@@ -79,6 +79,13 @@ struct SegmentWaterfallResponse: Codable {
 /// `GET /v1/companies/{code}/waterfall/geography` の公開 JSON の手書き。画面が読むキーだけ持つ。
 struct GeographyWaterfallResponse: Codable {
     var years: [Year]
+    /// 直近の有報の地域別の状態。`ok`（実データあり）/ 省略の理由 / `unavailable`（未取得）。古いサーバーは無い。
+    var latestStatus: String?
+
+    enum CodingKeys: String, CodingKey {
+        case years
+        case latestStatus = "latest_status"
+    }
 
     struct Year: Codable {
         var fyEnd: String?

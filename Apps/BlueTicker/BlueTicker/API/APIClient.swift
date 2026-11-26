@@ -102,6 +102,40 @@ actor APIClient {
         return try await get(url, cacheTTL: ttl(for: code))
     }
 
+    /// 地域別の年次推移と、直近の有報の地域別が省略・未取得かの理由を 1 本の取得で返す。
+    /// サーバーは応答の `latest_status`（200）または 404 の `reason` で伝える。どちらも無い古いサーバーは、
+    /// 従来どおり `breakdown?axis=geography` を別に取って判定する。
+    /// `missingReason` は `geographyMissingReason` と同じ意味（実データありは nil。省略は
+    /// `domestic_dominant_90pct` / `no_overseas_sales`、それ以外の 404 は `unavailable`、通信エラーなどは nil）。
+    func geographyWaterfallResult(
+        code: String, years: Int = 3
+    ) async -> (response: GeographyWaterfallResponse?, missingReason: String?) {
+        guard let url = try? queryURL("v1/companies/\(code)/waterfall/geography", [("years", String(years))])
+        else { return (nil, nil) }
+        do {
+            let response: GeographyWaterfallResponse = try await get(url, cacheTTL: ttl(for: code))
+            guard let status = response.latestStatus else {
+                return (response, await geographyMissingReason(code: code))
+            }
+            return (response, Self.geographyMissingReason(forStatus: status))
+        } catch APIClientError.http(let status, _) where status == 404 {
+            if let reason = notFoundReasons[url.absoluteString] {
+                return (nil, Self.geographyMissingReason(forStatus: reason))
+            }
+            return (nil, await geographyMissingReason(code: code))
+        } catch {
+            return (nil, nil)
+        }
+    }
+
+    private static func geographyMissingReason(forStatus status: String) -> String? {
+        switch status {
+        case "ok": return nil
+        case "domestic_dominant_90pct", "no_overseas_sales": return status
+        default: return "unavailable"
+        }
+    }
+
     /// 直近の `breakdown?axis=segment` が 404 だったときの理由。`single_segment_disclosed` なら単一セグメント。
     func segmentNotFoundReason(code: String) -> String? {
         guard let url = try? queryURL("v1/companies/\(code)/breakdown", [("axis", "segment")]) else { return nil }

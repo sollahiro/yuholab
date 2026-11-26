@@ -12,10 +12,32 @@ package func loadStoredGeographyWaterfall(
     if fiscalYear == nil, years <= 0 { return .absent }
     let snapshots = try await loadServableBreakdownYears(
         code: code4, axis: breakdownAxisGeography, db: db)
-    guard !snapshots.isEmpty else { return .absent }
-    let object = GeographyWaterfall.jsonObject(
+    // 直近の有報の地域別が省略・未取得か。年次推移は省略された年を落とすので、
+    // 古い年の実データを最新のように見せないよう、最新期の状態を応答に載せる（呼び出し側が別に問い合わせなくて済む）。
+    let latestStatus: String
+    switch try await loadStoredBreakdown(
+        code: code4, docId: nil, axis: breakdownAxisGeography, db: db)
+    {
+    case .found: latestStatus = geographyLatestStatusOk
+    case .notApplicable(let reason): latestStatus = reason
+    case .withheld, .absent: latestStatus = geographyLatestStatusUnavailable
+    }
+    guard !snapshots.isEmpty else {
+        return latestStatus == geographyLatestStatusOk
+            ? .absent : .notApplicable(reason: latestStatus)
+    }
+    var object = GeographyWaterfall.jsonObject(
         code: code4, years: snapshots, fiscalYear: fiscalYear, limit: max(1, years))
     let returned = object["years"] as? [[String: Any]] ?? []
-    guard !returned.isEmpty else { return .absent }
+    guard !returned.isEmpty else {
+        return latestStatus == geographyLatestStatusOk
+            ? .absent : .notApplicable(reason: latestStatus)
+    }
+    object["latest_status"] = latestStatus
     return .found(object)
 }
+
+/// 最新期の地域別が実データとして読める。
+let geographyLatestStatusOk = "ok"
+/// 最新期の地域別が未取得（行が無い・公開できない）。省略（`domestic_dominant_90pct` など）以外の 404。
+let geographyLatestStatusUnavailable = "unavailable"

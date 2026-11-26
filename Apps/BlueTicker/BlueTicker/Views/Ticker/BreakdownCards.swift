@@ -55,46 +55,48 @@ struct BreakdownModel {
     /// 取れたところから `update` で順に渡す（セグメントの棒 → 利益 → 地域）。全部そろうのを待たない。
     static func load(code: String, update: @MainActor (BreakdownModel) -> Void) async {
         var latest = BreakdownModel()
-        await loadCards(code: code) { model in
+        let missingReason = await loadCards(code: code) { model in
             latest = model
             update(model)
         }
         // 地域のカードが組めなかった会社は、省略の理由、または未取得の旨のカードを出す。
-        guard latest.region == nil, !latest.regionIsSegment,
-            let reason = await APIClient.shared.geographyMissingReason(code: code)
+        guard latest.region == nil, !latest.regionIsSegment, let reason = missingReason
         else { return }
         latest.regionOmission = reason
         await update(latest)
     }
 
-    private static func loadCards(code: String, update: @MainActor (BreakdownModel) -> Void) async {
+    /// 戻り値は直近の有報の地域別の省略・未取得の理由（実データがあれば nil）。
+    private static func loadCards(
+        code: String, update: @MainActor (BreakdownModel) -> Void
+    ) async -> String? {
         // 利益（最新期）は積み上げの取得を待たずに始める。
         async let detail = try? APIClient.shared.breakdown(code: code, axis: "segment")
-        // 直近の有報の地域別が 404（省略・未取得）なら、古い年の地域カードは出さない（`load` が理由のカードを出す）。
-        async let latestGeographyMissing = APIClient.shared.geographyMissingReason(code: code)
         // 地域の年次推移も同時に始める（セグメントの積み上げの完了を待たない）。
         // 年次推移の API は地域名を正規化済み。取れなければ、年ごとの内訳から組む。
-        async let regionWaterfall = try? APIClient.shared.geographyWaterfall(code: code, years: years)
+        // 応答は直近の有報の地域別が省略・未取得かも伝える（その場合、古い年の地域カードは出さず、
+        // `load` が理由のカードを出す）。
+        async let regionResult = APIClient.shared.geographyWaterfallResult(code: code, years: years)
         guard let waterfall = try? await APIClient.shared.segmentWaterfall(code: code, years: years) else {
             // 内訳が「単一セグメントのため省略」と返る会社は、その旨のカードを出す。
             _ = await detail
             if await APIClient.shared.segmentNotFoundReason(code: code) == singleSegmentReason {
                 await loadSingleSegment(
-                    latestGeographyMissing: await latestGeographyMissing,
-                    regionWaterfall: await regionWaterfall, update: update)
+                    latestGeographyMissing: (await regionResult).missingReason,
+                    regionWaterfall: (await regionResult).response, update: update)
             }
-            return
+            return (await regionResult).missingReason
         }
         // 再編で統合された旧区分は、過去の年も 1 本にまとめる（流れを追う必要はない）。
         let columns = BreakdownBuilder.collapsingReorgs(
             BreakdownBuilder.segmentColumns(waterfall) { Format.fy($0.fyEnd) })
         // 区分が 1 つだけでは構成も推移も見えない。
-        guard let latest = columns.last else { return }
+        guard let latest = columns.last else { return (await regionResult).missingReason }
         guard latest.items.count >= 2 else {
             await loadSingleSegment(
-                latestGeographyMissing: await latestGeographyMissing,
-                regionWaterfall: await regionWaterfall, update: update)
-            return
+                latestGeographyMissing: (await regionResult).missingReason,
+                regionWaterfall: (await regionResult).response, update: update)
+            return (await regionResult).missingReason
         }
         let layout = StackedLayout.make(columns: columns)
         func segmentModel(_ profitByKey: [String: Double]) -> SegmentCardModel {
@@ -118,10 +120,10 @@ struct BreakdownModel {
         // 3 段目: 地域。
         let geographic = detailRows.contains { $0.segmentBasis == "geographic" }
         var region: RegionCardModel?
-        if !geographic, await latestGeographyMissing != nil {
+        if !geographic, (await regionResult).missingReason != nil {
             // 直近の有報が省略・未取得: 古い年の実データを最新のように見せない。
         } else if !geographic {
-            if let response = await regionWaterfall,
+            if let response = (await regionResult).response,
                 let model = regionModel(
                     columns: BreakdownBuilder.geographyColumns(response) { Format.fy($0.fyEnd) })
             {
@@ -134,6 +136,7 @@ struct BreakdownModel {
         var final = BreakdownModel(segment: segment, region: region)
         final.regionIsSegment = geographic
         await update(final)
+        return (await regionResult).missingReason
     }
 
     /// 内訳 API が単一セグメントと返す理由。
