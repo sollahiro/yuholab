@@ -2104,6 +2104,34 @@ import Testing
         #expect(segmentLabels(snapshot) == ["日本", "海外"])
     }
 
+    /// 5016 JX金属: 行=地域（行ラベルが2列: アジア/中国…）、列=事業＋合計。
+    /// 行ラベル列の見出し「地域」と事業列の「その他」を地域列と数えて転置し、事業名の行を作っていた。
+    @Test func twoLevelRowLabelsWithBusinessColumnsKeepRegionRows() async throws {
+        let html = """
+            <p>当連結会計年度</p>
+            <p>顧客の所在地を基礎とし、国又は地域に分類しております。</p>
+            <table>
+              <tr><td></td><td></td><td></td><td></td><td></td><td>(単位：百万円)</td><td>(単位：百万円)</td></tr>
+              <tr><td>地域</td><td>地域</td><td>半導体材料</td><td>情報通信材料</td><td>基礎材料</td><td>その他</td><td>合計</td></tr>
+              <tr><td>日本</td><td>日本</td><td>28,821</td><td>157,520</td><td>384,353</td><td>2,500</td><td>573,194</td></tr>
+              <tr><td>アジア</td><td>中国</td><td>13,055</td><td>49,359</td><td>6</td><td>66</td><td>62,486</td></tr>
+              <tr><td>アジア</td><td>台湾</td><td>47,656</td><td>22,394</td><td>12</td><td>－</td><td>70,062</td></tr>
+              <tr><td>アジア</td><td>他アジア</td><td>34,522</td><td>47,923</td><td>26</td><td>－</td><td>82,471</td></tr>
+              <tr><td>米国</td><td>米国</td><td>36,754</td><td>28,661</td><td>1,494</td><td>－</td><td>66,909</td></tr>
+              <tr><td>その他</td><td>その他</td><td>15,757</td><td>8,738</td><td>5,021</td><td>－</td><td>29,516</td></tr>
+              <tr><td>合計</td><td>合計</td><td>176,565</td><td>314,595</td><td>390,912</td><td>2,566</td><td>884,638</td></tr>
+            </table>
+            """
+        let (snapshotOrNil, _) = await normalize(
+            html: html, sales: yen(884_638), docID: "S100YINW")
+        let snapshot = try #require(snapshotOrNil)
+        let rows = snapshot.rows.filter { $0.rowKind == "segment" }
+        #expect(rows.count == 6)
+        #expect(Set(rows.map(\.labelRaw)).isSuperset(of: ["日本", "中国", "台湾", "米国"]))
+        #expect(!snapshot.warnings.contains("geography_label_mismatch"))
+        #expect(!rows.contains { $0.labelRaw.contains("材料") })
+    }
+
     /// 8518 型: 日本 | その他 | 合計。列0の日本を地域列にし、Jev には合計だけ出す。
     @Test func horizontalJapanOtherTotalKeepsJapanAsRegionColumn() async throws {
         let html = """

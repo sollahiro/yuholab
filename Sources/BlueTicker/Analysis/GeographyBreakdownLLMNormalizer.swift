@@ -783,7 +783,11 @@ enum GeographyBreakdownLLMNormalizer {
     ) -> Int {
         let headerBlock = table.grid.prefix(table.headerRowCount)
         let yearSlicedHeader = headerFiscalYearLabels(table).count >= 2
-        let headerValues = table.columnHeaders.values.filter {
+        // 行ラベル列（本体の全セルに数字が無い列）の見出し「地域」は地域列に数えない。
+        // 5016 JX金属: 行=地域（c0/c1 は 地域・アジア/中国…）、列=事業＋合計。行ラベル列の「地域」と
+        // 事業列の「その他」を地域列と数えて転置し、事業名の行を作っていた。
+        let labelColumns = rowLabelColumns(table)
+        let headerValues = table.columnHeaders.filter { !labelColumns.contains($0.key) }.values.filter {
             !RevenueRecognitionCandidates.isYearSlicedGeographyColumnHeader($0)
         }
         // 2021年度 / 日本・2022年度 / 日本 と年をまたぐ表の下段セル「日本」を地域列に数えると、
@@ -791,12 +795,30 @@ enum GeographyBreakdownLLMNormalizer {
         // 年が1つだけの見出しは `collapsingSingleYearHeader` で期間見出しとして外してある。
         let gridValues: [String] = yearSlicedHeader
             ? []
-            : headerBlock.flatMap { $0 }
+            : headerBlock.flatMap { row in
+                row.enumerated().filter { !labelColumns.contains($0.offset) }.map(\.element)
+            }
         let headers = Array(headerValues) + gridValues
         return Set(headers.filter {
             RevenueRecognitionCandidates.isGeographyRegionColumnHeader($0)
                 && !RevenueRecognitionCandidates.isOfWhichColumnHeader($0)
         }.map { RevenueRecognitionCandidates.collapsedCell($0) }).count
+    }
+
+    /// 本体行の全セルに数字が無い列（行ラベル列）。
+    static func rowLabelColumns(
+        _ table: RevenueRecognitionCandidates.ParsedTable
+    ) -> Set<Int> {
+        let body = table.grid.dropFirst(table.headerRowCount)
+        guard !body.isEmpty else { return [] }
+        var result = Set<Int>()
+        for column in 0..<(table.grid.first?.count ?? 0) {
+            let hasDigit = body.contains { row in
+                column < row.count && row[column].contains { $0.isNumber }
+            }
+            if !hasDigit { result.insert(column) }
+        }
+        return result
     }
 
     /// 見出し行に出る YYYY年度 の種類。
