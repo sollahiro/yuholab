@@ -167,6 +167,58 @@ import Testing
         #expect(sameAs([]) == nil)
     }
 
+    // MARK: 見出しごとの判定（製品及びサービスの省略文を地域と取り違えない）
+
+    private func headedSameAs(_ sentences: [String]) -> String? {
+        BreakdownExtractor.geographySameAsSegmentStatement(
+            headed: BreakdownExtractor.headedSentences(from: sentences))
+    }
+
+    /// source: code=1959 クラフティア doc_id=S100YI0L 関連情報（製品の下の同様文、地域の下は本邦90%超）
+    @Test func productHeadingSameAsSentenceIsNotGeography() {
+        let sentences = [
+            "１．製品及びサービスごとの情報",
+            "セグメント情報に同様の情報を開示しているため、記載を省略している。",
+            "２．地域ごとの情報",
+            "(1)売上高",
+            "本邦の外部顧客への売上高が連結損益計算書の売上高の90％を超えるため、記載を省略している。",
+            "(2)有形固定資産",
+            "本邦に所在している有形固定資産の金額が連結貸借対照表の有形固定資産の金額の90％を超えるため、記載を省略している。",
+        ]
+        #expect(headedSameAs(sentences) == nil)
+        let headed = BreakdownExtractor.headedSentences(from: sentences)
+        #expect(headed.map(\.heading) == [.product, .geographySales, .geographyAssets])
+        #expect(
+            BreakdownExtractor.sentencesOnlyUnderNonGeographyHeadings(headed)
+                == ["セグメント情報に同様の情報を開示しているため、記載を省略している。"])
+    }
+
+    /// source: code=7928 旭化学 doc_id=S100ZJE8（見出しと本文が別の文）
+    @Test func geographySameAsWhenHeadingAndBodyAreSeparateSentences() {
+        let body = "セグメント情報に同様の情報を開示しているため、記載を省略しております。"
+        #expect(headedSameAs(["１．製品及びサービスごとの情報", "セグメント情報に同様の情報を開示しているため、記載を省略しております。", "２．地域ごとの情報", body]) == body)
+        #expect(headedSameAs(["２．地域ごとの情報", "(1)売上高", body]) == body)
+    }
+
+    /// source: code=7637 白銅 doc_id=S100YI9D（「地域ごとの売上高については…ご参照」）
+    @Test func geographySameAsWhenSalesReferenceLacksInformationWord() {
+        let body = "当社グループは報告セグメントを地域別のセグメントとしていることから、地域ごとの売上高については、「セグメント情報　３．報告セグメントごとの売上高、利益又は損失、資産、負債その他の項目の金額に関する情報」をご参照下さい。"
+        #expect(headedSameAs(["２．地域ごとの情報", "(1)売上高", body]) == body)
+    }
+
+    @Test func geographyAssetsReferenceIsNotSameAs() {
+        #expect(
+            headedSameAs([
+                "２．地域ごとの情報", "(1)売上高", "本邦以外の外部顧客への売上高がないため、該当事項はありません。",
+                "(2)有形固定資産", "セグメント情報に同様の情報を開示しているため、記載を省略している。",
+            ]) == nil)
+    }
+
+    @Test func selfContainedGeographySentenceStillWorksUnderProductHeading() {
+        let sentence = "地域ごとの情報は、セグメント情報に同様の情報を開示しているため、記載を省略しております。"
+        #expect(headedSameAs(["１．製品及びサービスごとの情報", sentence]) == sentence)
+    }
+
     // MARK: 前の表の脚注が、後続の売上表（当期）を資産表として落とさない
 
     /// source: code=6754 アンリツ doc_id=S100YH5E 地域別に関する情報（前期表・脚注・当期表の並び）
