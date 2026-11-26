@@ -219,6 +219,83 @@ import Testing
         #expect(headedSameAs(["１．製品及びサービスごとの情報", sentence]) == sentence)
     }
 
+    // MARK: 地域の表が前期のものだけのとき（ダイキン S100OG1V）
+
+    @Test func priorPeriodOnlyGeographyTablesAreDetected() {
+        let prior = BreakdownTable(heading: "地域ごとの情報", markdown: "| 日本 | 100 |", period: "前期")
+        let current = BreakdownTable(heading: "地域ごとの情報", markdown: "| 日本 | 110 |", period: "当期")
+        func extracted(_ tables: [BreakdownTable]) -> ExtractedBreakdown {
+            ExtractedBreakdown(method: tables.isEmpty ? "not_found" : "html_table", tables: tables, facts: [])
+        }
+        #expect(BreakdownExtractor.geographyTablesAreAllPriorPeriod(extracted([prior])))
+        #expect(!BreakdownExtractor.geographyTablesAreAllPriorPeriod(extracted([prior, current])))
+        #expect(!BreakdownExtractor.geographyTablesAreAllPriorPeriod(extracted([current])))
+        #expect(!BreakdownExtractor.geographyTablesAreAllPriorPeriod(extracted([])))
+    }
+
+    /// source: code=6367 ダイキン doc_id=S100W3XO（セグメント注記の表は売上の節の後に利益・資産・その他の項目が続く）
+    @Test func segmentNoteTableIsTrimmedToSalesSection() {
+        let markdown = """
+            | | 空調・冷凍機事業 | 化学事業 | 計 | その他 | 合計 | 調整額 | 連結財務諸表計上額 |
+            | --- | --- | --- | --- | --- | --- | --- | --- |
+            | 売上高 | | | | | | | |
+            | 日本 | 700,000 | 80,000 | 780,000 | 5,044 | 785,044 | | 785,044 |
+            | 米国 | 1,600,000 | 30,000 | 1,630,000 | 6,043 | 1,636,043 | | 1,636,043 |
+            | 外部顧客への売上高 | 4,600,000 | 140,000 | 4,740,000 | 12,335 | 4,752,335 | | 4,752,335 |
+            | セグメント利益 | 500,000 | 20,000 | 520,000 | 1,000 | 521,000 | -1,000 | 520,000 |
+            | その他の項目 | | | | | | | |
+            | 減価償却費 | 190,000 | 7,000 | 197,000 | 431 | 197,431 | | 197,431 |
+            """
+        let trimmed = BreakdownExtractor.trimToSegmentSalesSection(markdown)
+        #expect(trimmed.contains("日本"))
+        #expect(trimmed.contains("外部顧客への売上高"))
+        #expect(!trimmed.contains("セグメント利益"))
+        #expect(!trimmed.contains("減価償却費"))
+        // 区切りの行が無い表はそのまま。
+        let plain = "| | 売上高 |\n| --- | --- |\n| 日本 | 100 |\n| 米国 | 200 |"
+        #expect(BreakdownExtractor.trimToSegmentSalesSection(plain) == plain)
+    }
+
+    @Test func consolidatedColumnIsKeptWhenPresent() {
+        let markdown = """
+            | | 空調・冷凍機事業 | 化学事業 | 計 | その他 | 合計 | 調整額 | 連結財務諸表計上額 |
+            | --- | --- | --- | --- | --- | --- | --- | --- |
+            | 日本 | 700,000 | 80,000 | 780,000 | 5,044 | 785,044 | | 785,044 |
+            | 米国 | 1,600,000 | 30,000 | 1,630,000 | 6,043 | 1,636,043 | | 1,636,043 |
+            """
+        let narrowed = BreakdownExtractor.keepingConsolidatedColumn(markdown)
+        #expect(narrowed.contains("連結財務諸表計上額"))
+        #expect(narrowed.contains("785,044"))
+        #expect(!narrowed.contains("780,000"))
+        #expect(!narrowed.contains("空調・冷凍機事業"))
+        // 該当列が無い表はそのまま。
+        let plain = "| | 売上高 |\n| --- | --- |\n| 日本 | 100 |\n| 米国 | 200 |"
+        #expect(BreakdownExtractor.keepingConsolidatedColumn(plain) == plain)
+    }
+
+    /// source: code=4204 積水化学 doc_id=S100YBAY（「計」が報告セグメント小計と総合計の2列）
+    @Test func rightmostTotalColumnIsKeptWhenNoConsolidatedColumn() {
+        let markdown = """
+            | | 住宅 | 環境 | 計 | その他 | 調整額 | 計 |
+            | --- | --- | --- | --- | --- | --- | --- |
+            | 日本 | 500,000 | 300,000 | 800,000 | 88,981 | 2,476 | 891,457 |
+            | 北米 | 100,000 | 40,000 | 140,000 | 3,000 | 737 | 143,737 |
+            """
+        let narrowed = BreakdownExtractor.keepingConsolidatedColumn(markdown)
+        #expect(narrowed.contains("891,457"))
+        #expect(narrowed.contains("143,737"))
+        #expect(!narrowed.contains("800,000"))
+        #expect(!narrowed.contains("住宅"))
+    }
+
+    /// source: code=7972 イトーキ doc_id=S100XRIU（表の直前の「４．…増加額には、…」は脚注）
+    @Test func numberedProseFootnoteIsNotAnAssetCaption() {
+        #expect(BreakdownExtractor.isNumberedFootnoteLine(
+            "４．減価償却費、有形固定資産及び無形固定資産の増加額には、長期前払費用とその償却額が含まれております。"))
+        #expect(!BreakdownExtractor.isNumberedFootnoteLine("２．有形固定資産"))
+        #expect(!BreakdownExtractor.isNumberedFootnoteLine("２．地域ごとの情報"))
+    }
+
     // MARK: 前の表の脚注が、後続の売上表（当期）を資産表として落とさない
 
     /// source: code=6754 アンリツ doc_id=S100YH5E 地域別に関する情報（前期表・脚注・当期表の並び）

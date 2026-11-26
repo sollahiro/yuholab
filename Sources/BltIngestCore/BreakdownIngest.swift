@@ -216,7 +216,9 @@ func runBreakdownIngest(
             // 一時的な理由で今回だけ notApplicable 判定された場合に、既存の正しいデータを
             // 破壊してしまうため（Opus監査で指摘、issue #132）。`.failed` と同じ
             // 「今回は進展なし、次回また再試行対象になる」扱いにする。
-            if let existing, existing.source != breakdownSourceNotApplicable {
+            if let existing,
+                isProtectedBreakdownRow(existingSource: existing.source, newNotApplicableReason: reason)
+            {
                 logger?.warning(
                     "内訳取り込み(\(axis)): 既存の実データ行を notApplicable(\(reason)) で上書きしません(次回再試行): docID=\(cand.docID) code=\(cand.code)"
                 )
@@ -276,6 +278,21 @@ func runBreakdownIngest(
         notApplicableSingleSegmentDisclosed: notApplicableSingleSegmentDisclosed,
         notApplicableUnknown: notApplicableUnknown,
         failed: failed, skipped: skipped, purged: purged)
+}
+
+/// notApplicable の解決結果で既存行を上書きしてはいけないか。
+/// 実データ行（source が not_applicable でも same_as でもない）は守る。
+/// same_as は数字を持たない省略の行なので、本邦90%超・海外売上なしの決定論の省略（地域の見出しの下の文で確かめた
+/// 理由）で更新できる。製品の見出しの下の「同様の情報を開示」を取り違えた古い same_as（クラフティア 1959）を直すため。
+func isProtectedBreakdownRow(existingSource: String, newNotApplicableReason reason: String) -> Bool {
+    if existingSource == breakdownSourceNotApplicable { return false }
+    if existingSource == breakdownSourceSameAs,
+        reason == breakdownNotApplicableDomesticDominant90pct
+            || reason == breakdownNotApplicableNoOverseasSales
+    {
+        return false
+    }
+    return true
 }
 
 /// 解決済み内訳を company_breakdowns へ書き込む（既存行があれば更新、無ければ作成）。

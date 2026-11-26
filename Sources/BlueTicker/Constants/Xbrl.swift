@@ -1320,6 +1320,17 @@ enum Xbrl {
         "NotesSegmentInformationConsolidatedFinancialStatementsIFRSTextBlock",
         "SegmentInformationIFRSTextBlock",
     ]
+    /// J-GAAP セグメント注記。地域専用の注記が「セグメント情報に同様」で省略され、地域別の売上が
+    /// セグメント注記の収益の分解（行=地域・列=事業）に入っている型（ダイキン 6367）。
+    static let jgaapSegmentNoteGeographyFallbackTextBlockTags: Set<String> = [
+        "NotesSegmentInformationEtcConsolidatedFinancialStatementsTextBlock",
+        "NotesSegmentInformationEtcFinancialStatementsTextBlock",
+    ]
+    /// 上の注記で、地域別の売上を載せる表の見出し（「報告セグメントごとの売上高…及び収益の分解情報」）。
+    static let jgaapSegmentNoteGeographyFallbackHeadingKeywords: [String] = [
+        "収益の分解情報",
+        "収益の分解",
+    ]
     /// US-GAAP 注記23 型（野村 S100YC5C）の地域小見出し。見出し型一致があれば既定キーワードより優先する。
     static let usgaapNote23GeographyHeadingKeywords: [String] = [
         "［地域別情報］",
