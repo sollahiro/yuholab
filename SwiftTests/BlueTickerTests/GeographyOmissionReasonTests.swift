@@ -256,6 +256,23 @@ import Testing
         #expect(BreakdownExtractor.trimToSegmentSalesSection(plain) == plain)
     }
 
+    @Test func consolidatedColumnIsKeptWhenPresent() {
+        let markdown = """
+            | | 空調・冷凍機事業 | 化学事業 | 計 | その他 | 合計 | 調整額 | 連結財務諸表計上額 |
+            | --- | --- | --- | --- | --- | --- | --- | --- |
+            | 日本 | 700,000 | 80,000 | 780,000 | 5,044 | 785,044 | | 785,044 |
+            | 米国 | 1,600,000 | 30,000 | 1,630,000 | 6,043 | 1,636,043 | | 1,636,043 |
+            """
+        let narrowed = BreakdownExtractor.keepingConsolidatedColumn(markdown)
+        #expect(narrowed.contains("連結財務諸表計上額"))
+        #expect(narrowed.contains("785,044"))
+        #expect(!narrowed.contains("780,000"))
+        #expect(!narrowed.contains("空調・冷凍機事業"))
+        // 該当列が無い表はそのまま。
+        let plain = "| | 売上高 |\n| --- | --- |\n| 日本 | 100 |\n| 米国 | 200 |"
+        #expect(BreakdownExtractor.keepingConsolidatedColumn(plain) == plain)
+    }
+
     // MARK: 前の表の脚注が、後続の売上表（当期）を資産表として落とさない
 
     /// source: code=6754 アンリツ doc_id=S100YH5E 地域別に関する情報（前期表・脚注・当期表の並び）

@@ -1399,9 +1399,34 @@ enum BreakdownExtractor {
             mixedSkipNearestAssetCaptionTables: true
         ).filter(tableHasGeographyRegionLabels).map { table in
             var copy = table
-            copy.markdown = trimToSegmentSalesSection(table.markdown)
+            copy.markdown = keepingConsolidatedColumn(trimToSegmentSalesSection(table.markdown))
             return copy
         }
+    }
+
+    /// 列見出しに「連結財務諸表計上額」（連結計上額）がある表は、行ラベルの列とその列だけにする。
+    /// 事業別の列（計・その他・合計・調整額）を残すと、列選択が「その他」事業を含まない「計」を選び、
+    /// 警告なしで地域別の数字が少なく保存されるため（ダイキン S100W3XO: 「計」を選ぶと合計が97.8%）。
+    /// 該当する列が無い、または見出し行が複数の列に当たる表は、そのまま返す。
+    static func keepingConsolidatedColumn(_ markdown: String) -> String {
+        let grid = markdownToGrid(markdown)
+        var columnIndex: Int?
+        for row in grid.prefix(3) {
+            let hits = row.indices.dropFirst().filter { index in
+                let compact = row[index].filter { !$0.isWhitespace }
+                return compact.contains("連結") && compact.contains("計上額")
+            }
+            if hits.count == 1 {
+                columnIndex = hits[0]
+                break
+            }
+            if hits.count > 1 { return markdown }
+        }
+        guard let columnIndex else { return markdown }
+        let narrowed = grid.map { row in
+            columnIndex < row.count ? [row[0], row[columnIndex]] : [row[0]]
+        }
+        return gridToMarkdown(narrowed)
     }
 
     /// セグメント注記の表の、売上の節の後に続く「セグメント利益」「セグメント資産」「その他の項目（減価償却費…）」の
