@@ -25,6 +25,34 @@ import Testing
             == breakdownNotApplicableDomesticDominant90pct)
     }
 
+    /// same_as の取りこぼし(判定漏れ)の省略文。原文は実XBRLの「地域ごとの情報」節。
+    /// source: code=2340 doc_id=S100LTT9 page=0 field=geography 報告セグメントは「日本」のみ
+    @Test func staleSameAsOmissionWordings() {
+        let noOverseas = [
+            "当社グループの報告セグメントは「日本」のみであり、セグメント情報の開示の重要性が乏しいため、記載を省略しております。",
+            "本邦以外の外部顧客への事業収益がないため、該当事項はありません。",
+            "本邦以外の外部顧客への営業総収入がないため、該当事項はありません。",
+            "連結損益計算書の営業収入の金額が、本邦における営業収入であるため、記載を省略しております。",
+        ]
+        for sentence in noOverseas {
+            #expect(classify([sentence]) == breakdownNotApplicableNoOverseasSales, "\(sentence)")
+        }
+        let dominant = [
+            "本邦の外部顧客への売上高が連結損益計算書の売上高の90%を越えるため、記載を省略しております。",
+            "当行グループは、本邦の外部顧客に対する経常収益に区分した金額が連結損益計算書の経常収益の90％を超えるため、記載を省略しています。",
+            "本邦の外部顧客への売上高が損益計算書の売上高のほぼすべてを占めるため、記載を省略しております。",
+            "本邦に所在している非流動資産および本邦の外部顧客売上高が大半を占めるため、記載を省略しております。",
+            "本邦の外部顧客への営業収入が連結損益計算書の営業収入の90％を超えるため、記載を省略しております。",
+        ]
+        for sentence in dominant {
+            #expect(classify([sentence]) == breakdownNotApplicableDomesticDominant90pct, "\(sentence)")
+        }
+        // 有形固定資産だけの文・売上の欄が「該当事項はありません」だけの文は拾わない
+        #expect(classify(["本邦以外に所在している有形固定資産がないため、該当事項はありません。"]) == nil)
+        #expect(classify(["本邦に所在している有形固定資産の金額が連結貸借対照表の有形固定資産の金額の90％を超えるため、記載を省略しております。"]) == nil)
+        #expect(classify(["該当事項はありません。"]) == nil)
+    }
+
     /// 90% の数字を書かず「大部分を占める」と書く省略。
     /// source: code=2148 アイティメディア doc_id=S100YHX3 page=78 field=geography
     @Test func domesticMajorityWithoutNumberIsDomesticDominant() {
