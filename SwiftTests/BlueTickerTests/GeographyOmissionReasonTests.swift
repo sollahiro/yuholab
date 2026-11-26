@@ -233,6 +233,29 @@ import Testing
         #expect(!BreakdownExtractor.geographyTablesAreAllPriorPeriod(extracted([])))
     }
 
+    /// source: code=6367 ダイキン doc_id=S100W3XO（セグメント注記の表は売上の節の後に利益・資産・その他の項目が続く）
+    @Test func segmentNoteTableIsTrimmedToSalesSection() {
+        let markdown = """
+            | | 空調・冷凍機事業 | 化学事業 | 計 | その他 | 合計 | 調整額 | 連結財務諸表計上額 |
+            | --- | --- | --- | --- | --- | --- | --- | --- |
+            | 売上高 | | | | | | | |
+            | 日本 | 700,000 | 80,000 | 780,000 | 5,044 | 785,044 | | 785,044 |
+            | 米国 | 1,600,000 | 30,000 | 1,630,000 | 6,043 | 1,636,043 | | 1,636,043 |
+            | 外部顧客への売上高 | 4,600,000 | 140,000 | 4,740,000 | 12,335 | 4,752,335 | | 4,752,335 |
+            | セグメント利益 | 500,000 | 20,000 | 520,000 | 1,000 | 521,000 | -1,000 | 520,000 |
+            | その他の項目 | | | | | | | |
+            | 減価償却費 | 190,000 | 7,000 | 197,000 | 431 | 197,431 | | 197,431 |
+            """
+        let trimmed = BreakdownExtractor.trimToSegmentSalesSection(markdown)
+        #expect(trimmed.contains("日本"))
+        #expect(trimmed.contains("外部顧客への売上高"))
+        #expect(!trimmed.contains("セグメント利益"))
+        #expect(!trimmed.contains("減価償却費"))
+        // 区切りの行が無い表はそのまま。
+        let plain = "| | 売上高 |\n| --- | --- |\n| 日本 | 100 |\n| 米国 | 200 |"
+        #expect(BreakdownExtractor.trimToSegmentSalesSection(plain) == plain)
+    }
+
     // MARK: 前の表の脚注が、後続の売上表（当期）を資産表として落とさない
 
     /// source: code=6754 アンリツ doc_id=S100YH5E 地域別に関する情報（前期表・脚注・当期表の並び）

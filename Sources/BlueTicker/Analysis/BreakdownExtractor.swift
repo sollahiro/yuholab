@@ -1397,7 +1397,30 @@ enum BreakdownExtractor {
             mixedHeadingLikeOnly: true,
             dropOfWhichRegionColumns: true,
             mixedSkipNearestAssetCaptionTables: true
-        ).filter(tableHasGeographyRegionLabels)
+        ).filter(tableHasGeographyRegionLabels).map { table in
+            var copy = table
+            copy.markdown = trimToSegmentSalesSection(table.markdown)
+            return copy
+        }
+    }
+
+    /// セグメント注記の表の、売上の節の後に続く「セグメント利益」「セグメント資産」「その他の項目（減価償却費…）」の
+    /// 節を落とす。地域列の正規化が、その節の資産系の行で後続の行を捨てて地域行を失うため（ダイキン S100W3XO）。
+    /// 先頭行（列見出し）は残し、該当する行が無ければ表をそのまま返す。
+    static func trimToSegmentSalesSection(_ markdown: String) -> String {
+        let grid = markdownToGrid(markdown)
+        let stopPrefixes = [
+            "セグメント利益", "セグメント損失", "セグメント損益", "セグメント資産", "セグメント負債",
+            "その他の項目",
+        ]
+        guard let stop = grid.indices.dropFirst().first(where: { index in
+            guard let label = grid[index].first(where: {
+                !$0.trimmingCharacters(in: .whitespaces).isEmpty
+            }) else { return false }
+            let compact = label.filter { !$0.isWhitespace }
+            return stopPrefixes.contains { compact.hasPrefix($0) }
+        }) else { return markdown }
+        return gridToMarkdown(Array(grid[..<stop]))
     }
 
     /// markdown 表のデータ行先頭セル（行ラベル）に地域名キーワードが十分あるか。
