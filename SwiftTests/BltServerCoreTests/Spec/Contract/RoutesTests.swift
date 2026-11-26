@@ -392,6 +392,30 @@ private func send(
             let (status, json) = try await send(app, "/v1/companies/7203/waterfall/geography")
             #expect(status == .notFound)
             #expect(json?["error"] as? String == "地域別売上の年次推移は未算出です")
+            #expect(json?["reason"] as? String == "unavailable")
+        }
+    }
+
+    /// 直近の有報の地域別が省略（国内中心）のときは、年次推移も同じ reason の 404。
+    /// アプリは別に `breakdown?axis=geography` を取らずに省略の理由を知る。
+    @Test func geographyWaterfallReturns404WithReasonWhenLatestOmitted() async throws {
+        try await withApp(databases: true) { app in
+            let row = CompanyBreakdown(docID: "S1", axis: breakdownAxisGeography)
+            row.code = "7203"
+            row.submitDateTime = "2025-06-20 09:00"
+            row.payload = BreakdownSnapshotPayload(
+                axis: breakdownAxisGeography, denominator: 0, denominatorTag: "", rows: [],
+                sourceKind: breakdownSourceNotApplicable, needsReview: false, warnings: [])
+            row.needsReview = false
+            row.source = breakdownSourceNotApplicable
+            row.contentHash = ""
+            row.cacheVersion = geographyBreakdownCacheVersion
+            row.notApplicableReason = breakdownNotApplicableDomesticDominant90pct
+            try await row.create(on: app.db)
+
+            let (status, json) = try await send(app, "/v1/companies/7203/waterfall/geography")
+            #expect(status == .notFound)
+            #expect(json?["reason"] as? String == "domestic_dominant_90pct")
         }
     }
 

@@ -13,8 +13,9 @@ public actor HAPISOriginGate {
         case prefetch
     }
 
-    /// interactive の同時本数。銘柄面は 3 本（financials / overview / waterfall）を同時に出す。
-    public static let interactiveConcurrency = 3
+    /// interactive の同時本数。銘柄面は財務 3 本（financials / overview / waterfall）に、
+    /// 内訳（segment 内訳 / 地域内訳 / waterfall/segment / waterfall/geography）の 4 本が加わる。
+    public static let interactiveConcurrency = 6
     /// origin は HAPIS の 60/分より短い。先読みを約 15/分に抑える。
     public static let prefetchSpacing: TimeInterval = 4
     /// 最後の interactive からこの時間は先読みを出さない（操作中の帯域を先読みに取られないようにする）。
