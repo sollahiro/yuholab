@@ -1404,8 +1404,12 @@ extension BltServerContext {
             || (members.count <= 1 && dedicated.any != nil)
         let prose: [String]
         if axis == .geography {
+            // 製品及びサービス・主要な顧客の見出しの下だけにある文は、地域の省略文として Jev に渡さない。
+            let nonGeography = BreakdownExtractor.sentencesOnlyUnderNonGeographyHeadings(
+                BreakdownExtractor.segmentNoteHeadedSentences(xbrlDir: xbrlDir))
             prose = BreakdownExtractor.geographyDisclosureSentences(
-                from: BreakdownExtractor.segmentNotePatternProse(xbrlDir: xbrlDir))
+                from: BreakdownExtractor.segmentNotePatternProse(xbrlDir: xbrlDir)
+            ).filter { !nonGeography.contains($0) }
         } else {
             prose = BreakdownExtractor.segmentNotePatternProse(xbrlDir: xbrlDir)
         }
@@ -1426,7 +1430,7 @@ extension BltServerContext {
         // 地域ごとの情報（売上）がセグメント情報への参照だけの書類は、決定論で same_as にする。
         if axis == .geography,
             let statement = BreakdownExtractor.geographySameAsSegmentStatement(
-                in: BreakdownExtractor.segmentNoteSentences(xbrlDir: xbrlDir))
+                headed: BreakdownExtractor.segmentNoteHeadedSentences(xbrlDir: xbrlDir))
         {
             return .deterministic(.omittedSameAsSegment, evidence: statement)
         }

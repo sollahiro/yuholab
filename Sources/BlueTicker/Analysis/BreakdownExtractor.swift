@@ -832,6 +832,116 @@ enum BreakdownExtractor {
         return sentences
     }
 
+    /// 関連情報の見出しの下にある文か。見出しは「製品及びサービスごとの情報」「地域ごとの情報」など。
+    enum RelatedInfoHeading: Equatable {
+        case none
+        case product
+        case geographySales
+        case geographyAssets
+        case customers
+        case other
+    }
+
+    /// 見出しと文の組。`sentence` が見出しそのものの文は含めない。
+    struct HeadedSentence: Equatable {
+        var heading: RelatedInfoHeading
+        var sentence: String
+    }
+
+    private static let relatedInfoNumberPrefix = "[0-9０-９一二三四五六七八九〇.．、()（）]*"
+    private static let productHeadingPattern = try! NSRegularExpression(
+        pattern: "^" + relatedInfoNumberPrefix + "製品(及び|および|・)サービス(ごと|別)?(の|に関する)?情報")
+    private static let geographyHeadingPattern = try! NSRegularExpression(
+        pattern: "^" + relatedInfoNumberPrefix + "地域(ごと|別|に関する)(の|に関する)?情報")
+    private static let customersHeadingPattern = try! NSRegularExpression(
+        pattern: "^" + relatedInfoNumberPrefix + "主要な顧客(ごと|別)?(の|に関する)?情報")
+    private static let geographyAssetsSubheadingPattern = try! NSRegularExpression(
+        pattern: "^[（(][0-9０-９]+[)）](有形固定資産|非流動資産)")
+    private static let geographySalesSubheadingPattern = try! NSRegularExpression(
+        pattern: "^[（(][0-9０-９]+[)）](外部顧客への)?(売上高|売上収益|営業収益)")
+
+    /// 順に並んだ文へ、直近の見出しを付ける（純関数）。見出しは句点の無い短い文だけ。
+    /// 地域の見出しの直後は売上、「(2) 有形固定資産」以降は資産。
+    static func headedSentences(from sentences: [String]) -> [HeadedSentence] {
+        func matches(_ regex: NSRegularExpression, _ text: String) -> Bool {
+            regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
+        }
+        var current = RelatedInfoHeading.none
+        var result: [HeadedSentence] = []
+        for sentence in sentences {
+            let s = sentence.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "　", with: "")
+            let isHeadingLike = s.count <= 40 && !s.contains("。")
+            if isHeadingLike {
+                if matches(productHeadingPattern, s) {
+                    current = .product
+                    continue
+                }
+                if matches(geographyHeadingPattern, s) {
+                    current = .geographySales
+                    continue
+                }
+                if matches(customersHeadingPattern, s) {
+                    current = .customers
+                    continue
+                }
+                if current == .geographySales || current == .geographyAssets {
+                    if matches(geographyAssetsSubheadingPattern, s) {
+                        current = .geographyAssets
+                        continue
+                    }
+                    if matches(geographySalesSubheadingPattern, s) {
+                        current = .geographySales
+                        continue
+                    }
+                }
+                if s.contains("のれん") || s.contains("減損") {
+                    current = .other
+                    continue
+                }
+            }
+            result.append(HeadedSentence(heading: current, sentence: sentence))
+        }
+        return result
+    }
+
+    /// `segmentNoteSentences` と同じ文を、見出し付きで文書順に返す。重複排除しない
+    /// （「同様の情報を開示」が製品の下にも地域の下にも現れうるため）。TextBlock ごとに見出しを引き継がない。
+    static func segmentNoteHeadedSentences(xbrlDir: URL) -> [HeadedSentence] {
+        var result: [HeadedSentence] = []
+        for root in XBRLUtils.xbrlSearchRoots(in: xbrlDir) {
+            for file in XBRLUtils.findXbrlFiles(in: root) {
+                guard let data = try? Data(contentsOf: file) else { continue }
+                let collector = TextBlockSAXCollector(targetTags: segmentNoteOmissionTextBlockTags)
+                let parser = XMLParser(data: data)
+                parser.delegate = collector
+                parser.parse()
+                for block in collector.blocks {
+                    var sentences: [String] = []
+                    for source in omissionSentenceSources(in: block.content) {
+                        sentences.append(contentsOf: splitSentences(source))
+                    }
+                    result.append(contentsOf: headedSentences(from: sentences))
+                }
+            }
+        }
+        return result
+    }
+
+    /// 地域に関係しない見出し（製品及びサービス・主要な顧客）の下だけにある文。地域の見出しの下にも
+    /// 同じ文があるときは含めない。Jev に渡す前に落とす（クラフティア 1959: 製品の下の「同様の情報を開示」）。
+    static func sentencesOnlyUnderNonGeographyHeadings(_ headed: [HeadedSentence]) -> Set<String> {
+        var nonGeography = Set<String>()
+        var geography = Set<String>()
+        for item in headed {
+            switch item.heading {
+            case .product, .customers: nonGeography.insert(item.sentence)
+            case .geographySales, .geographyAssets: geography.insert(item.sentence)
+            case .none, .other: break
+            }
+        }
+        return nonGeography.subtracting(geography)
+    }
+
     /// 「。」で切る。句点の無い末尾も1文。改行は落とす。800 字を超える文は捨てる（表の崩れ）。
     static func splitSentences(_ text: String) -> [String] {
         let flattened = text.replacingOccurrences(of: "\n", with: "")
@@ -893,6 +1003,38 @@ enum BreakdownExtractor {
     /// 見出し「地域ごとの情報」と参照句の間に売上の語があり、有形固定資産・主要顧客・製品の語が無い文だけを拾う
     /// （「(2) 有形固定資産」だけがセグメント情報と同様、という文や、のれん注記の同様文は拾わない）。
     static func geographySameAsSegmentStatement(in sentences: [String]) -> String? {
+        geographySameAsSegmentStatement(
+            headed: sentences.map { HeadedSentence(heading: .none, sentence: $0) })
+    }
+
+    /// 見出し付き版。地域の売上の見出しの下にある、セグメント情報への参照だけの文は、見出しの語が文に無くても拾う
+    /// （旭化学: 見出し「地域ごとの情報」と本文が別の文、白銅: 「地域ごとの売上高については…ご参照」）。
+    /// 製品及びサービス・主要な顧客の見出しの下の参照文は、地域の見出しが文に無ければ使わない。
+    /// 1文の中に「地域ごとの情報」と参照が両方ある文は、従来どおり直前の見出しに関わらず使う。
+    static func geographySameAsSegmentStatement(headed: [HeadedSentence]) -> String? {
+        for item in headed where item.heading == .geographySales {
+            let s = item.sentence.replacingOccurrences(of: " ", with: "")
+                .replacingOccurrences(of: "　", with: "")
+            if s.contains("のれん") || s.contains("減損") || s.contains("有形固定資産")
+                || s.contains("非流動資産")
+            {
+                continue
+            }
+            let range = NSRange(s.startIndex..., in: s)
+            if geographySameAsReferencePattern.firstMatch(in: s, range: range) != nil {
+                return item.sentence.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        // 文に「地域ごとの情報」の見出しが自分で入っている文は、直前の見出しに関わらず使う（2813: 見出しと本文が1文）。
+        for item in headed {
+            if let statement = geographySameAsSelfContainedStatement(in: [item.sentence]) {
+                return statement
+            }
+        }
+        return nil
+    }
+
+    private static func geographySameAsSelfContainedStatement(in sentences: [String]) -> String? {
         for sentence in sentences {
             let s = sentence.replacingOccurrences(of: " ", with: "")
                 .replacingOccurrences(of: "　", with: "")
@@ -907,7 +1049,8 @@ enum BreakdownExtractor {
                 let referenceStart = Range(reference.range, in: tail)?.lowerBound
             else { continue }
             let between = tail[..<referenceStart]
-            guard between.contains("売上") else { continue }
+            // 見出しの直後に参照が続く文（「地域ごとの情報は、セグメント情報に同様の…」）は売上の語が無くても拾う。
+            guard between.contains("売上") || between.count <= 12 else { continue }
             if ["有形固定資産", "非流動資産", "顧客", "製品"].contains(where: { between.contains($0) }) {
                 continue
             }
