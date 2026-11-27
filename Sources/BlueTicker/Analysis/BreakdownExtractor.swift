@@ -971,6 +971,9 @@ enum BreakdownExtractor {
     /// 海外売上なし（「本邦以外の外部顧客への売上高がないため」「外部顧客への売上高は全て本邦」等）。
     private static let geographyNoOverseasSalesPatterns: [NSRegularExpression] = [
         "(本邦以外|日本以外|海外|国外)[^。]{0,40}(売上|収益|収入)[^。]{0,20}(が|は)(ない|無い|なく|ありません|存在しない|存在しません|ございません)",
+        // 本邦以外に連結子会社・支店がない（地域別の売上を分ける対象が無い）。有形固定資産だけの文は拾わない。
+        // ユーザー判断: 海外売上なしとして扱う（2479・3486・6078・6197・8715）。
+        "(本邦以外|日本以外|海外|国外)[^。]{0,30}(連結子会社|子会社|支店)[^。]{0,20}(が|は)(ない|無い|なく|ありません|存在しない|存在しません|ございません)",
         // 売上の金額がすべて本邦のもの（9034「営業収入の金額が、本邦における営業収入であるため」）。
         "(売上|収益|収入)[^。]{0,20}(が|は)[^。]{0,6}本邦における[^。]{0,6}(売上|収益|収入)であるため",
         // 報告セグメントが「日本」だけ（2340）。地域別を分ける対象が無い。
@@ -1106,7 +1109,8 @@ enum BreakdownExtractor {
             if filled.count == 1 { _ = try? table.unwrap() }
         }
         _ = try? doc.select("table").remove()
-        let paragraphs = (try? doc.select("p"))?.array() ?? []
+        // 省略文を見出し要素（h1〜h6）に入れている有報がある（9235 S100UL5C: <h5> 内）。段落と同じ順で拾う。
+        let paragraphs = (try? doc.select("p, h1, h2, h3, h4, h5, h6"))?.array() ?? []
         if paragraphs.isEmpty {
             let text = bs4Text(doc, strip: true)
             return text.isEmpty ? [] : [text]
