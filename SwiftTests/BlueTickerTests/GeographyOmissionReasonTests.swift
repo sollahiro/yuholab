@@ -62,6 +62,22 @@ import Testing
         #expect(classify(sentences) == breakdownNotApplicableDomesticDominant90pct)
     }
 
+    /// J-GAAP の収益認識注記・「収益を分解した」見出し・豪州の行を地域表として拾う(仕分け(b))。
+    /// source: code=7060 doc_id=S100YJZ1 page=0 field=geography 国内17,089,485 豪州9,237,950 その他48,191
+    @Test func staleSameAsRegionTableKeywordsAreRegistered() {
+        #expect(Xbrl.geographyRevenueDecompositionTextBlockTags.contains(
+            "NotesRevenueRecognitionConsolidatedFinancialStatementsTextBlock"))
+        #expect(Xbrl.jgaapSegmentNoteGeographyFallbackHeadingKeywords.contains("収益を分解した"))
+        #expect(Xbrl.geographyRegionTableExtraRowLabelKeywordsJa.contains("豪州"))
+        #expect(!Xbrl.geographyRegionTableExtraRowLabelKeywordsJa.contains("タイ"))
+    }
+
+    @Test func regionTableWithAustraliaRowCountsAsGeographyTable() {
+        let table = BreakdownTable(
+            heading: "4.地域別に関する情報", markdown: "| 地域 | 外部顧客への売上高 |\n|---|---|\n| 国内(日本) | 17,089,485 |\n| 豪州 | 9,237,950 |\n| その他 | 48,191 |\n| 計 | 26,375,627 |", period: "当期")
+        #expect(BreakdownExtractor.tableHasGeographyRegionLabels(table))
+    }
+
     /// 90% の数字を書かず「大部分を占める」と書く省略。
     /// source: code=2148 アイティメディア doc_id=S100YHX3 page=78 field=geography
     @Test func domesticMajorityWithoutNumberIsDomesticDominant() {

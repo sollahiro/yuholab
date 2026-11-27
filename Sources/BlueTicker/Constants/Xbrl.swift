@@ -1330,6 +1330,13 @@ enum Xbrl {
     static let jgaapSegmentNoteGeographyFallbackHeadingKeywords: [String] = [
         "収益の分解情報",
         "収益の分解",
+        "収益を分解した",  // 4116 S100TSOU:「4.顧客との契約から生じる収益を分解した情報」
+    ]
+    /// 収益分解・セグメント注記の地域表の行ラベルとして、地域名と数える追加の語。
+    /// `segmentGeographyLabelKeywordsJa`（列見出し判定など広く使う）には足さず、地域表の行判定だけで使う。
+    /// 7060 S100YJZ1 の豪州、他の国名の行。「タイ」は「タイヤ」と紛れるので入れない。
+    static let geographyRegionTableExtraRowLabelKeywordsJa: [String] = [
+        "豪州", "オーストラリア", "台湾", "韓国", "香港", "カナダ",
     ]
     /// 収益分解の表の中で、地域別の節を始める行の見出し。
     static let geographyMarketSectionLabels: Set<String> = [
@@ -1355,6 +1362,10 @@ enum Xbrl {
         "NotesNetSalesConsolidatedFinancialStatementsIFRSTextBlock",
         "NotesRevenueConsolidatedFinancialStatementsIFRSTextBlock",
         "NotesRevenue2ConsolidatedFinancialStatementsIFRSTextBlock",
+        // J-GAAP の収益認識注記（2918 S100Y6N1 / 4574 S100XSJ2 / 5632 S100YCQQ）。
+        // 地域専用タグが無い、または地域欄が収益認識注記の参照で済まされている会社が、
+        // 地域別売上を収益の分解（行=地域×列=事業）で開示している。
+        "NotesRevenueRecognitionConsolidatedFinancialStatementsTextBlock",
     ]
     static let geographyRevenueDecompositionHeading = "収益の分解"
     static let geographyDimensionKeywords: [String] = [
@@ -1379,6 +1390,10 @@ enum Xbrl {
         "NotesRevenueRecognitionConsolidatedFinancialStatementsTextBlock",
         "NotesRevenueConsolidatedFinancialStatementsIFRSTextBlock",
         "NotesRevenue2ConsolidatedFinancialStatementsIFRSTextBlock",
+        // J-GAAP の収益認識注記（2918 S100Y6N1 / 4574 S100XSJ2 / 5632 S100YCQQ）。
+        // 地域専用タグが無い、または地域欄が収益認識注記の参照で済まされている会社が、
+        // 地域別売上を収益の分解（行=地域×列=事業）で開示している。
+        "NotesRevenueRecognitionConsolidatedFinancialStatementsTextBlock",
     ]
 
     // MARK: - 事業別・地域別内訳の正規化（内訳取り込み, docs/breakdown.md）

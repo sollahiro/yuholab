@@ -1522,6 +1522,7 @@ enum BreakdownExtractor {
         }
         let hits = labels.filter { label in
             Xbrl.segmentSpecificGeographyLabelKeywordsJa.contains(where: label.contains)
+                || Xbrl.geographyRegionTableExtraRowLabelKeywordsJa.contains(where: label.contains)
         }
         return hits.count >= 2
     }
