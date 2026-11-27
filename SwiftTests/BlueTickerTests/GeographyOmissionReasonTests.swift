@@ -62,6 +62,41 @@ import Testing
         #expect(classify(sentences) == breakdownNotApplicableDomesticDominant90pct)
     }
 
+    /// J-GAAP の収益認識注記・「収益を分解した」見出し・豪州の行を地域表として拾う(仕分け(b))。
+    /// source: code=7060 doc_id=S100YJZ1 page=0 field=geography 国内17,089,485 豪州9,237,950 その他48,191
+    @Test func staleSameAsRegionTableKeywordsAreRegistered() {
+        #expect(Xbrl.geographyRevenueDecompositionTextBlockTags.contains(
+            "NotesRevenueRecognitionConsolidatedFinancialStatementsTextBlock"))
+        #expect(Xbrl.jgaapSegmentNoteGeographyFallbackHeadingKeywords.contains("収益を分解した"))
+        #expect(Xbrl.jgaapSegmentNoteGeographyFallbackHeadingKeywords.contains("地域別に関する情報"))
+        #expect(Xbrl.geographyRegionTableExtraRowLabelKeywordsJa.contains("豪州"))
+        #expect(!Xbrl.geographyRegionTableExtraRowLabelKeywordsJa.contains("タイ"))
+    }
+
+    /// source: code=2813 doc_id=S100OGSP page=0 field=geography member=JapanMember,UsaMember
+    @Test func usaMemberCountsAsGeographicSegment() {
+        #expect(BreakdownExtractor.segmentMembersAreGeographic(["JapanMember", "UsaMember"]))
+        #expect(BreakdownExtractor.segmentMembersAreGeographic(["JapanReportableSegmentMember", "UsaReportableSegmentMember"]))
+        #expect(!BreakdownExtractor.segmentMembersAreGeographic(["JapanMember", "UsageMember"]))
+        #expect(!BreakdownExtractor.segmentMembersAreGeographic([]))
+    }
+
+    /// 2813: 日本・米国の2行の後に収益認識の時期の行が続く表は、行数をセグメント数(2)以下と数える。
+    /// 電通: 日本・EMEA・米州・APAC の4行は、小計の前までで4行。
+    @Test func decompositionRowCountStopsAtTotalOrTimingRows() {
+        func rows(_ md: String) -> Int { BreakdownExtractor.decompositionDataRowCount(md) }
+        let s2813 = "| 地域 | 金額 |\n|---|---|\n| 日本 | 100 |\n| 米国 | 50 |\n| 収益認識の時期 | |\n| 一時点で移転される財 | 90 |\n| 一定期間にわたり移転されるサービス | 60 |"
+        #expect(rows(s2813) == 2)
+        let dentsu = "| 地域市場別内訳 | 金額 |\n|---|---|\n| 日本 | 530,133 |\n| EMEA | 275,411 |\n| 米州 | 324,013 |\n| APAC | 115,523 |\n| 小計 | 1,245,082 |"
+        #expect(rows(dentsu) == 4)
+    }
+
+    @Test func regionTableWithAustraliaRowCountsAsGeographyTable() {
+        let table = BreakdownTable(
+            heading: "4.地域別に関する情報", markdown: "| 地域 | 外部顧客への売上高 |\n|---|---|\n| 国内(日本) | 17,089,485 |\n| 豪州 | 9,237,950 |\n| その他 | 48,191 |\n| 計 | 26,375,627 |", period: "当期")
+        #expect(BreakdownExtractor.tableHasGeographyRegionLabels(table))
+    }
+
     /// 90% の数字を書かず「大部分を占める」と書く省略。
     /// source: code=2148 アイティメディア doc_id=S100YHX3 page=78 field=geography
     @Test func domesticMajorityWithoutNumberIsDomesticDominant() {

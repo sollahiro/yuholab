@@ -1347,7 +1347,12 @@ enum BreakdownExtractor {
                 copy.markdown = narrowingToRegionMarketSection(table.markdown)
                 return copy
             }.filter(tableHasGeographyRegionLabels)
-            if !revenueDecomp.isEmpty {
+            // 報告セグメントが地域区分で、収益分解の地域の行がセグメントより細かくないときは、セグメントがそのまま
+            // 地域別（same_as: segment）。表で地域別を作らない（2813: 日本・米国のセグメントと日本・米国の2行）。
+            // 電通のように地域がセグメント（国内・海外）より細かい（日本・EMEA・米州・APAC）ときは表を使う。
+            if !revenueDecomp.isEmpty,
+                !decompositionIsNoFinerThanGeographicSegments(revenueDecomp, xbrlDir: xbrlDir)
+            {
                 tables = revenueDecomp
             }
         }
@@ -1398,14 +1403,57 @@ enum BreakdownExtractor {
             && result.tables.allSatisfy { $0.period == "前期" && !htmlTableHasCurrentPeriodRow($0) }
     }
 
+    /// 当期の報告セグメントがすべて地域区分（日本・米国、国内事業・海外事業など）か。
+    static func reportableSegmentsAreGeographic(xbrlDir: URL) -> Bool {
+        let members = SegmentBreakdownResolver.currentSegmentMembers(
+            in: extractReportableSegmentInfo(xbrlDir: xbrlDir).facts)
+        return segmentMembersAreGeographic(members)
+    }
+
+    /// member 名がすべて地域区分か。`Usa` は member 名の略記（2813 の UsaMember）。「Usage」などは地域にしない。
+    static func segmentMembersAreGeographic(_ members: [String]) -> Bool {
+        guard !members.isEmpty else { return false }
+        if BreakdownNormalizer.allMembersAreGeography(members) { return true }
+        return members.allSatisfy { member in
+            Xbrl.segmentGeographyMemberKeywords.contains(where: member.contains)
+                || (member.contains("Usa") && !member.contains("Usage"))
+        }
+    }
+
+    /// 収益分解の表のデータ行数。地域の語の一致は使わない（EMEA・APAC などの略称は語に無い）。
+    /// 見出しの行は数えず、最初の小計・合計の行、または収益認識の時期の行（一時点・一定期間。2813）で数えるのを止める。
+    static func decompositionDataRowCount(_ markdown: String) -> Int {
+        let headerWords = ["地域", "区分", "売上", "収益", "内訳", "セグメント"]
+        let stopWords = ["計", "外部顧客", "時期", "一時点", "一定期間"]
+        var count = 0
+        for raw in rowLabelsFromMarkdown(markdown) {
+            let label = raw.filter { !$0.isWhitespace }
+            if label.isEmpty { continue }
+            if stopWords.contains(where: label.contains) { break }
+            if headerWords.contains(where: label.contains) { continue }
+            count += 1
+        }
+        return count
+    }
+
+    /// 収益分解の地域表の地域の行数が、地域区分の報告セグメントの数以下か（セグメントと同じ粒度）。
+    static func decompositionIsNoFinerThanGeographicSegments(
+        _ tables: [BreakdownTable], xbrlDir: URL
+    ) -> Bool {
+        let members = SegmentBreakdownResolver.currentSegmentMembers(
+            in: extractReportableSegmentInfo(xbrlDir: xbrlDir).facts)
+        guard segmentMembersAreGeographic(members) else { return false }
+        return tables.allSatisfy { table in
+            decompositionDataRowCount(table.markdown) <= members.count
+        }
+    }
+
     /// 地域専用の注記が省略されているとき、J-GAAP セグメント注記の収益の分解表（行が地域名）を候補にする。
     /// 地域専用の注記がある書類に限る。報告セグメントが地域別の会社は、その表がセグメントそのもの
     /// （same_as: segment）なので使わない。
     static func jgaapSegmentNoteGeographyTables(xbrlDir: URL) -> [BreakdownTable] {
         guard hasDedicatedGeographyTextBlock(xbrlDir: xbrlDir) else { return [] }
-        let members = SegmentBreakdownResolver.currentSegmentMembers(
-            in: extractReportableSegmentInfo(xbrlDir: xbrlDir).facts)
-        if !members.isEmpty, BreakdownNormalizer.allMembersAreGeography(members) { return [] }
+        if reportableSegmentsAreGeographic(xbrlDir: xbrlDir) { return [] }
         return extractFromTextBlocks(
             xbrlDir: xbrlDir,
             dedicatedTags: [],
@@ -1522,6 +1570,7 @@ enum BreakdownExtractor {
         }
         let hits = labels.filter { label in
             Xbrl.segmentSpecificGeographyLabelKeywordsJa.contains(where: label.contains)
+                || Xbrl.geographyRegionTableExtraRowLabelKeywordsJa.contains(where: label.contains)
         }
         return hits.count >= 2
     }
