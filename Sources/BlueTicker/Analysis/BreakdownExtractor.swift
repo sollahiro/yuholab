@@ -1334,7 +1334,11 @@ enum BreakdownExtractor {
                 mixedKeywords: [],
                 skipGeographyAssetMetricTables: true,
                 dropOfWhichRegionColumns: true
-            ).filter(tableHasGeographyRegionLabels)
+            ).map { table in
+                var copy = table
+                copy.markdown = narrowingToRegionMarketSection(table.markdown)
+                return copy
+            }.filter(tableHasGeographyRegionLabels)
             if !revenueDecomp.isEmpty {
                 tables = revenueDecomp
             }
@@ -1447,6 +1451,37 @@ enum BreakdownExtractor {
         guard let columnIndex else { return markdown }
         let narrowed = grid.map { row in
             columnIndex < row.count ? [row[0], row[columnIndex]] : [row[0]]
+        }
+        return gridToMarkdown(narrowed)
+    }
+
+    /// 収益分解の表が「サービス別」などの節と「地域市場別内訳」の節を縦に積み、列が事業・小計・調整・合計の形
+    /// （4324 S100QHOJ）。見出し行・地域の節の行・「小計」列だけにする。事業の列（国内事業 / 海外事業）を残すと
+    /// 列が地域の表と読まれて事業が地域の行になり、節の前の合計行が小計として重複するため。
+    /// 形が揃わない表（節の見出しが無い、前に別の節の合計が無い、小計の列が無い）はそのまま返す。
+    static func narrowingToRegionMarketSection(_ markdown: String) -> String {
+        let grid = markdownToGrid(markdown)
+        func label(_ row: [String]) -> String {
+            (row.first ?? "").filter { !$0.isWhitespace }
+        }
+        guard
+            let section = grid.indices.first(where: {
+                Xbrl.geographyMarketSectionLabels.contains(label(grid[$0]))
+            }),
+            grid[..<section].contains(where: { label($0) == "合計" }),
+            let headerEnd = grid[..<section].lastIndex(where: { row in
+                row.dropFirst().contains { $0.filter { !$0.isWhitespace } == "小計" }
+            }),
+            let column = grid[headerEnd].indices.dropFirst().first(where: {
+                grid[headerEnd][$0].filter { !$0.isWhitespace } == "小計"
+            }),
+            let end = grid.indices.first(where: { $0 > section && label(grid[$0]) == "合計" })
+        else { return markdown }
+        let body = grid[(section + 1)...end]
+        guard body.allSatisfy({ column < $0.count && XBRLUtils.parseHtmlNumber($0[column]) != nil })
+        else { return markdown }
+        let narrowed = (Array(grid[...headerEnd]) + Array(body)).map { row in
+            column < row.count ? [row[0], row[column]] : [row[0]]
         }
         return gridToMarkdown(narrowed)
     }

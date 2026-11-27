@@ -1331,6 +1331,12 @@ enum Xbrl {
         "収益の分解情報",
         "収益の分解",
     ]
+    /// 収益分解の表の中で、地域別の節を始める行の見出し。
+    static let geographyMarketSectionLabels: Set<String> = [
+        "地域市場別内訳",
+        "地域別内訳",
+        "地理的市場",
+    ]
     /// US-GAAP 注記23 型（野村 S100YC5C）の地域小見出し。見出し型一致があれば既定キーワードより優先する。
     static let usgaapNote23GeographyHeadingKeywords: [String] = [
         "［地域別情報］",
