@@ -73,6 +73,14 @@ import Testing
         #expect(!Xbrl.geographyRegionTableExtraRowLabelKeywordsJa.contains("タイ"))
     }
 
+    /// source: code=2813 doc_id=S100OGSP page=0 field=geography member=JapanMember,UsaMember
+    @Test func usaMemberCountsAsGeographicSegment() {
+        #expect(BreakdownExtractor.segmentMembersAreGeographic(["JapanMember", "UsaMember"]))
+        #expect(BreakdownExtractor.segmentMembersAreGeographic(["JapanReportableSegmentMember", "UsaReportableSegmentMember"]))
+        #expect(!BreakdownExtractor.segmentMembersAreGeographic(["JapanMember", "UsageMember"]))
+        #expect(!BreakdownExtractor.segmentMembersAreGeographic([]))
+    }
+
     @Test func regionTableWithAustraliaRowCountsAsGeographyTable() {
         let table = BreakdownTable(
             heading: "4.地域別に関する情報", markdown: "| 地域 | 外部顧客への売上高 |\n|---|---|\n| 国内(日本) | 17,089,485 |\n| 豪州 | 9,237,950 |\n| その他 | 48,191 |\n| 計 | 26,375,627 |", period: "当期")

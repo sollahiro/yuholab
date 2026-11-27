@@ -1330,12 +1330,9 @@ enum BreakdownExtractor {
         // 地域注記側に売上表が残らない（売上省略＋資産表除外）ときだけ、
         // 収益の分解（NotesNetSales）から地域行のある表を拾う。
         // 単に tables.isEmpty だけでは不十分（地域専用 TextBlock 無しの誤発火を防ぐ）。
-        // 報告セグメントが地域区分（日本・米国など）の会社は、セグメントがそのまま地域別（same_as: segment）。
-        // 収益認識注記の表で地域別を作らない（2813: 地域欄が「セグメント情報に同様」、収益認識注記の表は事業×地域）。
         if tables.isEmpty,
             hasDedicatedGeographyTextBlock(xbrlDir: xbrlDir)
-                || hasGeographyRevenueOmissionMarker(xbrlDir: xbrlDir),
-            !reportableSegmentsAreGeographic(xbrlDir: xbrlDir)
+                || hasGeographyRevenueOmissionMarker(xbrlDir: xbrlDir)
         {
             let revenueDecomp = extractFromTextBlocks(
                 xbrlDir: xbrlDir,
@@ -1350,7 +1347,12 @@ enum BreakdownExtractor {
                 copy.markdown = narrowingToRegionMarketSection(table.markdown)
                 return copy
             }.filter(tableHasGeographyRegionLabels)
-            if !revenueDecomp.isEmpty {
+            // 報告セグメントが地域区分で、収益分解の地域の行がセグメントより細かくないときは、セグメントがそのまま
+            // 地域別（same_as: segment）。表で地域別を作らない（2813: 日本・米国のセグメントと日本・米国の2行）。
+            // 電通のように地域がセグメント（国内・海外）より細かい（日本・EMEA・米州・APAC）ときは表を使う。
+            if !revenueDecomp.isEmpty,
+                !decompositionIsNoFinerThanGeographicSegments(revenueDecomp, xbrlDir: xbrlDir)
+            {
                 tables = revenueDecomp
             }
         }
@@ -1405,7 +1407,36 @@ enum BreakdownExtractor {
     static func reportableSegmentsAreGeographic(xbrlDir: URL) -> Bool {
         let members = SegmentBreakdownResolver.currentSegmentMembers(
             in: extractReportableSegmentInfo(xbrlDir: xbrlDir).facts)
-        return !members.isEmpty && BreakdownNormalizer.allMembersAreGeography(members)
+        return segmentMembersAreGeographic(members)
+    }
+
+    /// member 名がすべて地域区分か。`Usa` は member 名の略記（2813 の UsaMember）。「Usage」などは地域にしない。
+    static func segmentMembersAreGeographic(_ members: [String]) -> Bool {
+        guard !members.isEmpty else { return false }
+        if BreakdownNormalizer.allMembersAreGeography(members) { return true }
+        return members.allSatisfy { member in
+            Xbrl.segmentGeographyMemberKeywords.contains(where: member.contains)
+                || (member.contains("Usa") && !member.contains("Usage"))
+        }
+    }
+
+    /// 収益分解の地域表の地域の行数が、地域区分の報告セグメントの数以下か（セグメントと同じ粒度）。
+    static func decompositionIsNoFinerThanGeographicSegments(
+        _ tables: [BreakdownTable], xbrlDir: URL
+    ) -> Bool {
+        let members = SegmentBreakdownResolver.currentSegmentMembers(
+            in: extractReportableSegmentInfo(xbrlDir: xbrlDir).facts)
+        guard segmentMembersAreGeographic(members) else { return false }
+        return tables.allSatisfy { table in
+            // 地域の語の一致は使わない（EMEA・APAC などの略称は語に無い）。見出し・小計・合計の行を除いた行数で見る。
+            let dataRows = rowLabelsFromMarkdown(table.markdown).map { $0.filter { !$0.isWhitespace } }
+                .filter { label in
+                    !label.isEmpty
+                        && !["計", "合計", "小計", "外部顧客", "地域", "区分", "売上", "収益", "内訳", "セグメント"]
+                            .contains(where: label.contains)
+                }
+            return dataRows.count <= members.count
+        }
     }
 
     /// 地域専用の注記が省略されているとき、J-GAAP セグメント注記の収益の分解表（行が地域名）を候補にする。
