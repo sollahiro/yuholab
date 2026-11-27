@@ -1109,7 +1109,8 @@ enum BreakdownExtractor {
             if filled.count == 1 { _ = try? table.unwrap() }
         }
         _ = try? doc.select("table").remove()
-        let paragraphs = (try? doc.select("p"))?.array() ?? []
+        // 省略文を見出し要素（h1〜h6）に入れている有報がある（9235 S100UL5C: <h5> 内）。段落と同じ順で拾う。
+        let paragraphs = (try? doc.select("p, h1, h2, h3, h4, h5, h6"))?.array() ?? []
         if paragraphs.isEmpty {
             let text = bs4Text(doc, strip: true)
             return text.isEmpty ? [] : [text]

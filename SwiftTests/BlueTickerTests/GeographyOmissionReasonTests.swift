@@ -53,6 +53,15 @@ import Testing
         #expect(classify(["該当事項はありません。"]) == nil)
     }
 
+    /// 省略文が見出し要素（h5）の中にあっても拾う。
+    /// source: code=9235 doc_id=S100UL5C page=0 field=geography
+    @Test func omissionSentenceInsideHeadingElementIsPicked() {
+        let html = "<h5>(1) 売上高</h5><h5>本邦の外部顧客への売上高が連結損益計算書の売上高の90％を超えるため、記載を省略しております。</h5>"
+        let sources = BreakdownExtractor.omissionSentenceSources(in: html)
+        let sentences = sources.flatMap { BreakdownExtractor.omissionSentences(in: $0) }
+        #expect(classify(sentences) == breakdownNotApplicableDomesticDominant90pct)
+    }
+
     /// 90% の数字を書かず「大部分を占める」と書く省略。
     /// source: code=2148 アイティメディア doc_id=S100YHX3 page=78 field=geography
     @Test func domesticMajorityWithoutNumberIsDomesticDominant() {
