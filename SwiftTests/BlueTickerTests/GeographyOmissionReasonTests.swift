@@ -108,8 +108,11 @@ import Testing
         #expect(classify(["本邦に所在している有形固定資産の金額が連結貸借対照表の有形固定資産の金額の90％を超えるため、記載を省略しております。"]) == nil)
         // 製品 90% 文
         #expect(classify(["単一の製品・サービスの区分の外部顧客への売上高が連結損益計算書の売上高の90％を超えるため、記載を省略しております。"]) == nil)
-        // 本邦以外に拠点が無い（売上の文ではない）
-        #expect(classify(["本邦以外の国又は地域に所在する連結子会社及び在外支店がないため、該当事項はありません。"]) == nil)
+        // 本邦以外に拠点が無い文は、ユーザー判断で海外売上なし（売上の語は無いが、地域別を分ける対象が無い）
+        #expect(classify(["本邦以外の国又は地域に所在する連結子会社及び在外支店がないため、該当事項はありません。"])
+            == breakdownNotApplicableNoOverseasSales)
+        #expect(classify(["本邦以外の国又は地域に所在する支店及び連結子会社がないため該当事項はありません。"])
+            == breakdownNotApplicableNoOverseasSales)
         // セグメントと同一の省略は same_as 側で扱う
         #expect(classify(["セグメント情報に同様の情報を開示しているため、記載を省略しています。"]) == nil)
         #expect(classify([]) == nil)
