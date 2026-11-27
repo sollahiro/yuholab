@@ -14,7 +14,6 @@ struct RootView: View {
     @State private var large = LargeScreenModel()
     /// ツールバー・タブバーが側面にあるか（ウィンドウ全体の safe area の左右差で決める）。
     @State private var hasSideControls = false
-    private let router = IntentRouter.shared
     @Query(sort: \WatchedCompany.sortOrder) private var watched: [WatchedCompany]
 
     var body: some View {
@@ -45,18 +44,6 @@ struct RootView: View {
             try? await Task.sleep(for: .milliseconds(800))
             guard !Task.isCancelled else { return }
             await APIClient.shared.prefetchAnalysis(codes: codes)
-        }
-        .onChange(of: router.pending, initial: true) { _, company in
-            // Siri / ショートカットの「結果画面を開く」。ホームタブに銘柄面を積む。
-            guard let company else { return }
-            router.pending = nil
-            tab = 0
-            if isRegular {
-                large.update(0) { $0.mode = .detail }
-                large.open(company, tab: 0)
-            } else {
-                searchPath = NavigationPath([company])
-            }
         }
         .onChange(of: isRegular) { _, regular in
             // 開く: 外側で開いていた画面に対応する内側の画面へ。閉じる: 内側の画面に対応する外側の画面へ。
