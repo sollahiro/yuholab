@@ -52,6 +52,6 @@ description: use this when making, fixing, or reviewing a company logo icon imag
 - **自動合格シート**に載せるのは、正規化 pass かつ **短辺 ≥ 256px** のものだけ。短辺 256 未満や low_res / lockup / low_vis に該当するものは自動合格に入れず、再ソース枠（または通常の差し替えレビュー）へ回す。
 
 ## 7. 置き場所と公開
-- 完成画像は R2 `blue-ticker-icons` の `company-icons/{code}.png` に置き、読み戻して sha を確認する。上書きする前に既存の画像をバックアップする。CDN は `https://icons.sollahiro.com/company-icons/{code}.png`（キャッシュ 4h）。  // pragma: allowlist secret
+- 完成画像は R2 `blue-ticker-icons` の `company-icons/{code}.png` に置き、読み戻して sha を確認する。上書きする前に既存の画像をバックアップする。CDN は `https://icons.yuholab.com/company-icons/{code}.png`（キャッシュ 4h）。  // pragma: allowlist secret
 - 未 GO の候補は `company-icons/review/{date}/` に仮置きし、本番キーを上書きしない。CDN はキャッシュがあるので、作り直した候補は別プレフィックスに置く。
 - PR やコメントに会社ロゴを載せない。Git に画像バイナリを入れない。秘密値を出力しない。

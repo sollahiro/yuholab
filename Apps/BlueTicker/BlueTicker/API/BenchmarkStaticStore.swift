@@ -9,7 +9,7 @@ import Foundation
 actor BenchmarkStaticStore {
     static let shared = BenchmarkStaticStore()
 
-    static let baseURL = URL(string: "https://feed.sollahiro.com/blue-ticker/benchmark/")!
+    static let baseURL = URL(string: "https://feed.yuholab.com/blue-ticker/benchmark/")!
     /// 配信側の `Cache-Control: max-age=3600` に合わせる。
     static let revalidateInterval: TimeInterval = 60 * 60
     /// 読める応答の `schema_version`。違う版は使わず（保存も捨て）REST に任せる。

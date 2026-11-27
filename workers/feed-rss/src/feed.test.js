@@ -37,7 +37,7 @@ function makeEnv(bucket) {
     FEED_BUCKET: bucket,
     FEED_OBJECT_KEY: KEY,
     FEED_PUBLIC_URL: "https://feed.yuholab.com/blue-ticker/edinet-filings.xml",
-    FEED_ICON_BASE_URL: "https://icons.sollahiro.com",
+    FEED_ICON_BASE_URL: "https://icons.yuholab.com",
   };
 }
 
@@ -120,7 +120,7 @@ describe("refreshFeed", () => {
     assert.deepEqual(queries[1].params, [["7203", "477A"]]);
     const body = bucket.calls[0].body;
     assert.equal(
-      (body.match(/<media:thumbnail url="https:\/\/icons\.sollahiro\.com\/company-icons\/7203\.ico"\/>/g) ?? [])
+      (body.match(/<media:thumbnail url="https:\/\/icons\.yuholab\.com\/company-icons\/7203\.ico"\/>/g) ?? [])
         .length,
       2
     );

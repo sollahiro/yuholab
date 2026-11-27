@@ -10,7 +10,7 @@ enum APIConfiguration {
     /// Debug の「HAPIS 本番」は App Attest。`stub` 上書きは Simulator / ローカル用。Release は常に App Attest。
     private static let attestModeStorageKey = "blt.hapis.attestMode"
     /// REST が `icon_url: null` のときの公開ホスト（秘密ではない。拡張子は会社ごとに違う）。
-    static let defaultIconBaseURL = URL(string: "https://icons.sollahiro.com")!
+    static let defaultIconBaseURL = URL(string: "https://icons.yuholab.com")!
     private static let storageKey = "blt.api.baseURL"
     private static let issuerStorageKey = "blt.hapis.issuerURL"
     private static let gatewayStorageKey = "blt.hapis.gatewayBaseURL"

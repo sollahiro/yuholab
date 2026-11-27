@@ -197,7 +197,7 @@ describe("buildRss", () => {
       doc_type_label: "有価証券報告書",
       fy_end: "2026-03",
       submitted_at: "2026-10-09 15:30",
-      icon_url: "https://icons.sollahiro.com/company-icons/7203.png",
+      icon_url: "https://icons.yuholab.com/company-icons/7203.png",
     },
     {
       code: "477A",
@@ -277,7 +277,7 @@ describe("buildRss", () => {
     const second = xml.slice(xml.indexOf("S100BBB"));
     assert.ok(
       first.includes(
-        '<media:thumbnail url="https://icons.sollahiro.com/company-icons/7203.png"/>'
+        '<media:thumbnail url="https://icons.yuholab.com/company-icons/7203.png"/>'
       )
     );
     assert.ok(!second.includes("<media:thumbnail"));
