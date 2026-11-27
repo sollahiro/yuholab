@@ -19,7 +19,7 @@ private let sample = """
           <category domain="edinet:doc_type">130</category>
           <category domain="jp:sec_code">8145</category>
           <description>決算期:  / 証券コード: 8145</description>
-          <media:thumbnail url="https://icons.sollahiro.com/company-icons/8145.png"/>
+          <media:thumbnail url="https://icons.yuholab.com/company-icons/8145.png"/>
         </item>
         <item>
           <title>A&amp;B（サンプル）ホールディングス株式会社（477A） 有価証券報告書</title>
@@ -47,7 +47,7 @@ private let sample = """
         #expect(first.docType == "130")
         #expect(first.docTypeLabel == "訂正有価証券報告書")
         #expect(first.submittedAt == "2026-10-20 15:18")
-        #expect(first.iconURL == "https://icons.sollahiro.com/company-icons/8145.png")
+        #expect(first.iconURL == "https://icons.yuholab.com/company-icons/8145.png")
     }
 
     @Test func nameKeepsParenthesesBeforeTheCode() throws {

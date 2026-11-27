@@ -62,7 +62,7 @@ function silentLog() {
 const env = (bucket) => ({
   BENCHMARK_BUCKET: bucket,
   BENCHMARK_OBJECT_PREFIX: "blue-ticker/benchmark/",
-  BENCHMARK_ICON_BASE_URL: "https://icons.sollahiro.com",
+  BENCHMARK_ICON_BASE_URL: "https://icons.yuholab.com",
 });
 
 describe("benchmarkKpis", () => {
@@ -153,7 +153,7 @@ describe("refreshBenchmarks", () => {
     assert.equal(bucket.calls[0].options.httpMetadata.contentType, CONTENT_TYPE);
     assert.equal(bucket.calls[0].options.httpMetadata.cacheControl, CACHE_CONTROL);
     const body = JSON.parse(bucket.calls[0].body);
-    assert.equal(body.companies[0].icon_url, "https://icons.sollahiro.com/icons/8306.png");
+    assert.equal(body.companies[0].icon_url, "https://icons.yuholab.com/icons/8306.png");
   });
   test("アイコン失敗でも本体は書く（icon_url は null）", async () => {
     const bucket = fakeBucket();

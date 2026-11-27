@@ -4,7 +4,7 @@
 
 ## 例外: 静的 RSS フィード
 
-`feed.sollahiro.com` の静的 RSS は認証なしの公開（R2 カスタムドメイン。Worker ルートも origin へのパスもない）。それ以外は本ファイルどおり HAPIS + App Attest / Access のまま。origin の起動ガードは変更なし。詳細は `public-api.md`。
+`feed.yuholab.com` の静的 RSS は認証なしの公開（R2 カスタムドメイン。Worker ルートも origin へのパスもない）。それ以外は本ファイルどおり HAPIS + App Attest / Access のまま。origin の起動ガードは変更なし。詳細は `public-api.md`。
 
 ## origin の起動ガード
 

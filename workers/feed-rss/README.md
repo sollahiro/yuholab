@@ -3,7 +3,7 @@
 EDINET に提出された上場会社の有価証券報告書（ヘッドラインのみ）を RSS 2.0 で公開する。
 チャネル名は「有報LAB — 直近提出書類」、チャネル `<link>` は `https://yuholab.com`（workers/legal が配信する有報LAB のページ）。
 Cron が 1 日 1 回 Neon を読み、RSS XML を R2 の静的オブジェクトとして書き出す。
-配信は R2 カスタムドメイン `feed.sollahiro.com` が担い、この Worker 自体は公開ルートを持たない。
+配信は R2 カスタムドメイン `feed.yuholab.com` が担い、この Worker 自体は公開ルートを持たない。
 
 ## スケジュール
 
@@ -69,7 +69,7 @@ Swift 側のラベル・対象種別・listed 判定を変えたら fixture も�
 
 ## 公開 URL
 
-- `https://feed.sollahiro.com/blue-ticker/edinet-filings.xml`
+- `https://feed.yuholab.com/blue-ticker/edinet-filings.xml`
 
 ## セキュリティ
 
@@ -88,7 +88,7 @@ Swift 側のラベル・対象種別・listed 判定を変えたら fixture も�
    npx wrangler@4 r2 bucket create blt-public-feed
    ```
 
-2. カスタムドメイン `feed.sollahiro.com` をバケットへ接続（ダッシュボード: R2 → バケット → Settings → Custom Domains）
+2. カスタムドメイン `feed.yuholab.com` をバケットへ接続（ダッシュボード: R2 → バケット → Settings → Custom Domains）
 
 3. Neon に読み取り専用ロールを作る:
 

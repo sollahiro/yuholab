@@ -197,7 +197,7 @@ describe("buildRss", () => {
       doc_type_label: "有価証券報告書",
       fy_end: "2026-03",
       submitted_at: "2026-10-09 15:30",
-      icon_url: "https://icons.sollahiro.com/company-icons/7203.png",
+      icon_url: "https://icons.yuholab.com/company-icons/7203.png",
     },
     {
       code: "477A",
@@ -212,7 +212,7 @@ describe("buildRss", () => {
   const xml = buildRss({
     items,
     now: new Date("2026-10-10T10:15:00Z"),
-    feedUrl: "https://feed.sollahiro.com/blue-ticker/edinet-filings.xml",
+    feedUrl: "https://feed.yuholab.com/blue-ticker/edinet-filings.xml",
   });
 
   test("XML 宣言とチャネル要素", () => {
@@ -231,7 +231,7 @@ describe("buildRss", () => {
     assert.ok(xml.includes("<ttl>1440</ttl>"));
     assert.ok(
       xml.includes(
-        '<atom:link href="https://feed.sollahiro.com/blue-ticker/edinet-filings.xml" rel="self" type="application/rss+xml"/>'
+        '<atom:link href="https://feed.yuholab.com/blue-ticker/edinet-filings.xml" rel="self" type="application/rss+xml"/>'
       )
     );
   });
@@ -277,7 +277,7 @@ describe("buildRss", () => {
     const second = xml.slice(xml.indexOf("S100BBB"));
     assert.ok(
       first.includes(
-        '<media:thumbnail url="https://icons.sollahiro.com/company-icons/7203.png"/>'
+        '<media:thumbnail url="https://icons.yuholab.com/company-icons/7203.png"/>'
       )
     );
     assert.ok(!second.includes("<media:thumbnail"));

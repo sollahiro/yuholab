@@ -108,7 +108,7 @@ flowchart LR
     facade --> svc["Services / Analysis"]
     svc --> edinet[("EDINET")]
     server -.->|DB read| pg[("Neon")]
-    rss["Feed RSS Worker（cron 19:15 JST）"] -.->|"Neon read-only → R2"| r2[("feed.sollahiro.com")]
+    rss["Feed RSS Worker（cron 19:15 JST）"] -.->|"Neon read-only → R2"| r2[("feed.yuholab.com")]
 ```
 
 認証: `CF_ACCESS_TEAM_DOMAIN` あり → Access（エッジ信頼） / なし → 無認証（loopback、または `BLT_ALLOW_UNAUTHENTICATED=1`）。非 loopback でどちらも無いと起動拒否。詳細は `api-auth.md` / `.agents/skills/deploy/SKILL.md`。

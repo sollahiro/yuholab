@@ -10,7 +10,7 @@ import Foundation
 /// 銘柄コードは `<category domain="jp:sec_code">` から取る（タイトルから読まない）。
 /// 社名はタイトルの「社名（コード） 書類種別」から、コードの括弧より前を取る。
 enum FeedRSS {
-    static let url = URL(string: "https://feed.sollahiro.com/blue-ticker/edinet-filings.xml")!
+    static let url = URL(string: "https://feed.yuholab.com/blue-ticker/edinet-filings.xml")!
     /// RSS の `Cache-Control: max-age=3600` に合わせる。前回の取得からこの間は再検証しない。
     static let revalidateInterval: TimeInterval = 60 * 60
     /// Top feed に出す書類種別。有報（120）だけ。RSS も有報だけだが、他の種別が混ざっても出さない。
