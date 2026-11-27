@@ -68,6 +68,7 @@ import Testing
         #expect(Xbrl.geographyRevenueDecompositionTextBlockTags.contains(
             "NotesRevenueRecognitionConsolidatedFinancialStatementsTextBlock"))
         #expect(Xbrl.jgaapSegmentNoteGeographyFallbackHeadingKeywords.contains("収益を分解した"))
+        #expect(Xbrl.jgaapSegmentNoteGeographyFallbackHeadingKeywords.contains("地域別に関する情報"))
         #expect(Xbrl.geographyRegionTableExtraRowLabelKeywordsJa.contains("豪州"))
         #expect(!Xbrl.geographyRegionTableExtraRowLabelKeywordsJa.contains("タイ"))
     }

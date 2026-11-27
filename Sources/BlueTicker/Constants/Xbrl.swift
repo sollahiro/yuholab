@@ -1330,6 +1330,7 @@ enum Xbrl {
     static let jgaapSegmentNoteGeographyFallbackHeadingKeywords: [String] = [
         "収益の分解情報",
         "収益の分解",
+        "地域別に関する情報",  // 7060 S100YJZ1:「4.地域別に関する情報」
         "収益を分解した",  // 4116 S100TSOU:「4.顧客との契約から生じる収益を分解した情報」
     ]
     /// 収益分解・セグメント注記の地域表の行ラベルとして、地域名と数える追加の語。

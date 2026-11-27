@@ -1330,9 +1330,12 @@ enum BreakdownExtractor {
         // 地域注記側に売上表が残らない（売上省略＋資産表除外）ときだけ、
         // 収益の分解（NotesNetSales）から地域行のある表を拾う。
         // 単に tables.isEmpty だけでは不十分（地域専用 TextBlock 無しの誤発火を防ぐ）。
+        // 報告セグメントが地域区分（日本・米国など）の会社は、セグメントがそのまま地域別（same_as: segment）。
+        // 収益認識注記の表で地域別を作らない（2813: 地域欄が「セグメント情報に同様」、収益認識注記の表は事業×地域）。
         if tables.isEmpty,
             hasDedicatedGeographyTextBlock(xbrlDir: xbrlDir)
-                || hasGeographyRevenueOmissionMarker(xbrlDir: xbrlDir)
+                || hasGeographyRevenueOmissionMarker(xbrlDir: xbrlDir),
+            !reportableSegmentsAreGeographic(xbrlDir: xbrlDir)
         {
             let revenueDecomp = extractFromTextBlocks(
                 xbrlDir: xbrlDir,
@@ -1398,14 +1401,19 @@ enum BreakdownExtractor {
             && result.tables.allSatisfy { $0.period == "前期" && !htmlTableHasCurrentPeriodRow($0) }
     }
 
+    /// 当期の報告セグメントがすべて地域区分（日本・米国、国内事業・海外事業など）か。
+    static func reportableSegmentsAreGeographic(xbrlDir: URL) -> Bool {
+        let members = SegmentBreakdownResolver.currentSegmentMembers(
+            in: extractReportableSegmentInfo(xbrlDir: xbrlDir).facts)
+        return !members.isEmpty && BreakdownNormalizer.allMembersAreGeography(members)
+    }
+
     /// 地域専用の注記が省略されているとき、J-GAAP セグメント注記の収益の分解表（行が地域名）を候補にする。
     /// 地域専用の注記がある書類に限る。報告セグメントが地域別の会社は、その表がセグメントそのもの
     /// （same_as: segment）なので使わない。
     static func jgaapSegmentNoteGeographyTables(xbrlDir: URL) -> [BreakdownTable] {
         guard hasDedicatedGeographyTextBlock(xbrlDir: xbrlDir) else { return [] }
-        let members = SegmentBreakdownResolver.currentSegmentMembers(
-            in: extractReportableSegmentInfo(xbrlDir: xbrlDir).facts)
-        if !members.isEmpty, BreakdownNormalizer.allMembersAreGeography(members) { return [] }
+        if reportableSegmentsAreGeographic(xbrlDir: xbrlDir) { return [] }
         return extractFromTextBlocks(
             xbrlDir: xbrlDir,
             dedicatedTags: [],
