@@ -36,7 +36,7 @@ function makeEnv(bucket) {
   return {
     FEED_BUCKET: bucket,
     FEED_OBJECT_KEY: KEY,
-    FEED_PUBLIC_URL: "https://feed.sollahiro.com/blue-ticker/edinet-filings.xml",
+    FEED_PUBLIC_URL: "https://feed.yuholab.com/blue-ticker/edinet-filings.xml",
     FEED_ICON_BASE_URL: "https://icons.sollahiro.com",
   };
 }

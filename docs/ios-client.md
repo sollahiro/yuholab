@@ -239,7 +239,7 @@ Debug 実機で Attest を試す: 開発ラボの「HAPIS 本番」（既定で 
 
 ### Top feed（公開 RSS）
 
-- 取得元は `https://feed.sollahiro.com/blue-ticker/edinet-filings.xml`（`workers/feed-rss`。毎日 19:15 JST 生成）。HAPIS・トークン・オリジン・Neon を通らない。`/v1/feed/updates` へはフォールバックしない。鮮度は 1 日 1 回
+- 取得元は `https://feed.yuholab.com/blue-ticker/edinet-filings.xml`（`workers/feed-rss`。毎日 19:15 JST 生成）。HAPIS・トークン・オリジン・Neon を通らない。`/v1/feed/updates` へはフォールバックしない。鮮度は 1 日 1 回
 - 表示：ホームを開いたら端末に保存済みの RSS を解析してすぐ出す。裏で `If-None-Match` / `If-Modified-Since` 付きの条件付き GET を送り、304 は取得時刻だけ進め、200 は保存を差し替えて画面を更新する
 - 間隔：前回の取得から 1 時間（RSS の `max-age`）以内は再検証しない。フォアグラウンド復帰時も同じ条件で再検証する
 - 失敗時：保存済みの分を出し続ける。途中で切れた本文（`</rss>` が無い）は失敗扱いで、保存を差し替えない

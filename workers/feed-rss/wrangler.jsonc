@@ -3,7 +3,7 @@
   "main": "src/index.js",
   "compatibility_date": "2026-09-19",
   // Cron 専用 Worker。公開ルートは持たない（fetch は常に 404）。
-  // フィードは R2 カスタムドメイン feed.sollahiro.com からだけ配信する。
+  // フィードは R2 カスタムドメイン feed.yuholab.com からだけ配信する。
   // この Worker を api.* / mcp.* の前段に置かない（Tunnel + Access はそのまま）。
   "workers_dev": false,
   "triggers": {
@@ -18,7 +18,7 @@
   ],
   "vars": {
     "FEED_OBJECT_KEY": "blue-ticker/edinet-filings.xml",
-    "FEED_PUBLIC_URL": "https://feed.sollahiro.com/blue-ticker/edinet-filings.xml",
+    "FEED_PUBLIC_URL": "https://feed.yuholab.com/blue-ticker/edinet-filings.xml",
     // 会社アイコンの公開ベース URL（blt-server の BLT_R2_PUBLIC_BASE_URL と同じ値）。
     "FEED_ICON_BASE_URL": "https://icons.sollahiro.com"
   }

@@ -10,7 +10,7 @@
 
 ## 例外: 静的 RSS（EDINET 提出ヘッドライン）
 
-`https://feed.sollahiro.com/blue-ticker/edinet-filings.xml` は認証なしの公開。2026-09-09 ロックに対する**狭い文書化済み例外**で、これ以外はすべて HAPIS 経由（iOS は App Attest、公開コネクタは OAuth）のまま。BLT origin は閉じたまま（`BLT_ALLOW_UNAUTHENTICATED` は使わない）。
+`https://feed.yuholab.com/blue-ticker/edinet-filings.xml` は認証なしの公開。2026-09-09 ロックに対する**狭い文書化済み例外**で、これ以外はすべて HAPIS 経由（iOS は App Attest、公開コネクタは OAuth）のまま。BLT origin は閉じたまま（`BLT_ALLOW_UNAUTHENTICATED` は使わない）。
 
 - Cron Worker `workers/feed-rss` が日次（19:15 JST）に Neon を読み取り専用ロールで読み、R2 へ静的オブジェクトとして書く。配信は R2 カスタムドメイン
 - ヘッドラインのみ（社名・書類種別・提出日時・決算期・コード・doc_id）と、会社アイコンの公開 URL（`media:thumbnail`。アイコンのある会社だけ）。アイコン URL を一覧で出すのはこの RSS だけで、アイコン専用のエンドポイントは公開しない（2026-10-19 Sorahiro）

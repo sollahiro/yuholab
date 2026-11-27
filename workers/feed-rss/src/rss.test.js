@@ -212,7 +212,7 @@ describe("buildRss", () => {
   const xml = buildRss({
     items,
     now: new Date("2026-10-10T10:15:00Z"),
-    feedUrl: "https://feed.sollahiro.com/blue-ticker/edinet-filings.xml",
+    feedUrl: "https://feed.yuholab.com/blue-ticker/edinet-filings.xml",
   });
 
   test("XML 宣言とチャネル要素", () => {
@@ -231,7 +231,7 @@ describe("buildRss", () => {
     assert.ok(xml.includes("<ttl>1440</ttl>"));
     assert.ok(
       xml.includes(
-        '<atom:link href="https://feed.sollahiro.com/blue-ticker/edinet-filings.xml" rel="self" type="application/rss+xml"/>'
+        '<atom:link href="https://feed.yuholab.com/blue-ticker/edinet-filings.xml" rel="self" type="application/rss+xml"/>'
       )
     );
   });
