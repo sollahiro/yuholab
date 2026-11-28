@@ -115,4 +115,58 @@ private func seedYear(
             #expect(again.count == stored.count)
         }
     }
+
+    @Test func reorgJudgementsAreStoredOnceAndServedAsLinks() async throws {
+        try await withMigratedApp { app in
+            let db = app.db
+            try await seedYear(
+                docID: "S2025", periodEnd: "2025-03-31", submit: "2025-06-20 09:00",
+                rows: [segmentRow("AlphaMember", value: 10_000_000), segmentRow("BetaMember", value: 5_000_000)],
+                db: db)
+            try await seedYear(
+                docID: "S2026", periodEnd: "2026-03-31", submit: "2026-06-20 09:00",
+                rows: [segmentRow("GammaMember", value: 9_000_000), segmentRow("DeltaMember", value: 8_000_000)],
+                db: db)
+            let calls = JudgeCalls()
+            let judge: SegmentReorgJudge = { question, previousDocID, docID, judged in
+                await calls.record([previousDocID, docID])
+                return question.old.flatMap { old in
+                    question.new.filter { !judged.contains([old.key, $0.key]) && !question.linked.contains([old.key, $0.key]) }.map { new in
+                        SegmentReorgVerdict(
+                            oldKey: old.key, newKey: new.key,
+                            decision: old.key.hasSuffix("AlphaMember") && new.key.hasSuffix("GammaMember")
+                                ? segmentTransitionDecisionSuccessor
+                                : segmentTransitionDecisionSuccessorNone)
+                    }
+                }
+            }
+            try await runSegmentTransitionIngest(db: db, listedCodes: ["1234"], judge: judge)
+            let first = try await CompanySegmentTransition.query(on: db).all()
+            try await runSegmentTransitionIngest(db: db, listedCodes: ["1234"], judge: judge)
+            let second = try await CompanySegmentTransition.query(on: db).all()
+
+            #expect(await calls.values == [["S2025", "S2026"]])
+            #expect(Set(first.compactMap(\.id)) == Set(second.compactMap(\.id)))
+            #expect(second.filter { segmentTransitionSuccessorDecisions.contains($0.decision) }.count == 4)
+
+            guard
+                case .found(let object) = try await loadStoredSegmentWaterfall(
+                    code: "1234", metric: segmentWaterfallMetricExternalSales, key: nil, years: 5,
+                    fiscalYear: nil, db: db)
+            else {
+                Issue.record("年次応答が無い")
+                return
+            }
+            let year = try #require((object["years"] as? [[String: Any]])?.first)
+            #expect(
+                year[segmentWaterfallReorgLinksKey] as? [[String: String]] == [
+                    ["from": "E00001:ext:AlphaMember", "to": "E00001:ext:GammaMember", "basis": "jev"]
+                ])
+        }
+    }
+}
+
+private actor JudgeCalls {
+    private(set) var values: [[String]] = []
+    func record(_ value: [String]) { values.append(value) }
 }

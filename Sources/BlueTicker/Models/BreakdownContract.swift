@@ -190,6 +190,16 @@ public let segmentTransitionDecisionBreak = "break"
 public let segmentTransitionDecisionNeedsReview = "needs_review"
 public let segmentTransitionBasisDeterministic = "deterministic"
 public let segmentTransitionBasisJev = "jev"
+/// 再編の旧区分 → 新区分の Jev 判定の行（`company_segment_transitions`）。年のつなぎ（`prior` / `line_cut`）には使わない。
+/// successor は移った、successor_none は移っていない、successor_review は決められなかった。
+public let segmentTransitionDecisionSuccessor = "successor"
+public let segmentTransitionDecisionSuccessorNone = "successor_none"
+public let segmentTransitionDecisionSuccessorReview = "successor_review"
+public let segmentTransitionSuccessorDecisions: Set<String> = [
+    segmentTransitionDecisionSuccessor, segmentTransitionDecisionSuccessorNone,
+    segmentTransitionDecisionSuccessorReview,
+]
+public let segmentTransitionMatchedReorg = "reorg"
 public let segmentTransitionMatchedSameKey = "same_key"
 public let segmentTransitionMatchedLabelAndValue = "label_and_value"
 public let segmentTransitionMatchedPluralOnly = "plural_only"

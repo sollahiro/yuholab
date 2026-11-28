@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import BlueTickerCore
@@ -55,5 +56,103 @@ import Testing
         let missing = GeographyWaterfall.missingYears(
             covered: [2026, 2025, 2022], sales: sales, limit: 5)
         #expect(missing.compactMap { $0["fiscal_year"] as? Int } == [2024, 2023])
+    }
+}
+
+private actor ReorgAnswers: SegmentReorgDeciding {
+    private let movedPairs: Set<[String]>
+    private(set) var asked: Set<[String]> = []
+
+    init(movedPairs: Set<[String]>) { self.movedPairs = movedPairs }
+
+    func chooseReorg(_ pair: SegmentReorgPair) async -> JevChoiceAggregate.Sample {
+        asked.insert([pair.oldLabel, pair.newLabel])
+        let selected = movedPairs.contains([pair.oldLabel, pair.newLabel])
+            ? SegmentReorgJev.moved : SegmentReorgJev.notMoved
+        return JevChoiceAggregate.Sample(
+            selected: selected, probability: 0.99, options: SegmentReorgJev.options, model: "test")
+    }
+}
+
+@Suite struct SegmentReorgJevTests {
+    private func row(_ key: String, _ label: String, _ value: Double) -> BreakdownRowPayload {
+        var row = BreakdownRowPayload(
+            labelRaw: label, label: label, amount: value, profit: nil, rowKind: "segment")
+        row.segmentKey = key
+        row.externalSales = BreakdownMetricCellPayload(
+            value: value, basis: breakdownSourceXbrlFacts, source: "Sales", decimals: -6)
+        return row
+    }
+
+    private func payload(_ rows: [BreakdownRowPayload]) -> BreakdownSnapshotPayload {
+        BreakdownSnapshotPayload(
+            axis: breakdownAxisSegment, denominator: 1, denominatorTag: "Sales",
+            rows: rows, sourceKind: breakdownSourceXbrlFacts, needsReview: false, warnings: [])
+    }
+
+    private var old: BreakdownSnapshotPayload {
+        payload([row("TEL", "通信事業", 100), row("BIZ", "業務用システム事業", 50), row("SHOP0", "店舗サービス事業", 70)])
+    }
+
+    private var new: BreakdownSnapshotPayload {
+        payload([
+            // 旧と新の合計が合う部分集合が無い値（金額で組に分けられず regroup のまま）。
+            row("TE", "通信・エネルギー事業", 200), row("SHOP", "店舗・施設ソリューション事業", 15),
+            row("FIN", "金融事業", 5),
+        ])
+    }
+
+    @Test func asksEveryUnlinkedPairAndKeepsManyToManyAnswers() async throws {
+        let question = try #require(
+            SegmentWaterfall.reorgQuestion(
+                fyEnd: "2025-08-31", previous: ("2024-08-31", "A", old), payload: new, transitions: []))
+        #expect(question.old.map(\.key) == ["TEL", "BIZ", "SHOP0"])
+        #expect(question.linked == [["TEL", "TE"]])
+        let decider = ReorgAnswers(movedPairs: [
+            ["業務用システム事業", "店舗・施設ソリューション事業"], ["店舗サービス事業", "店舗・施設ソリューション事業"],
+            ["店舗サービス事業", "金融事業"],
+        ])
+        let verdicts = await SegmentReorgJev.judge(
+            question, previousFilingText: "前", currentFilingText: "当",
+            skipping: [["BIZ", "TE"]], decider: decider)
+        // 3 × 3 組から、名称で決まった 1 組と判定済みの 1 組を除く。
+        #expect(verdicts.count == 7)
+        #expect(
+            verdicts.filter { $0.decision == segmentTransitionDecisionSuccessor }
+                .map { [$0.oldKey, $0.newKey] }
+                == [["BIZ", "SHOP"], ["SHOP0", "SHOP"], ["SHOP0", "FIN"]])
+    }
+
+    @Test func storedSuccessorsBecomeJevLinksWithoutChangingPriorOrLineCut() throws {
+        let years = [
+            (fyEnd: "2024-08-31", docID: "A", payload: old),
+            (fyEnd: "2025-08-31", docID: "B", payload: new),
+        ]
+        func year(_ transitions: [SegmentTransitionDraft]) throws -> [String: Any] {
+            let json = SegmentWaterfall.jsonObject(
+                code: "9418", metric: segmentWaterfallMetricExternalSales, years: years,
+                transitions: transitions)
+            return try #require((json["years"] as? [[String: Any]])?.first)
+        }
+        func draft(_ decision: String, _ from: String, _ to: String) -> SegmentTransitionDraft {
+            SegmentTransitionDraft(
+                oldKey: from, newKey: to, fyEnd: "2025-08-31", decision: decision,
+                basis: segmentTransitionBasisJev, matched: segmentTransitionMatchedReorg)
+        }
+        let plain = try year([])
+        let judged = try year([
+            draft(segmentTransitionDecisionSuccessor, "BIZ", "SHOP"),
+            draft(segmentTransitionDecisionSuccessorNone, "BIZ", "FIN"),
+        ])
+        let links = try #require(judged[segmentWaterfallReorgLinksKey] as? [[String: String]])
+        #expect(links == [
+            ["from": "TEL", "to": "TE", "basis": "name"], ["from": "BIZ", "to": "SHOP", "basis": "jev"],
+        ])
+        func stripped(_ object: [String: Any]) throws -> Data {
+            var copy = object
+            copy.removeValue(forKey: segmentWaterfallReorgLinksKey)
+            return try JSONSerialization.data(withJSONObject: copy, options: [.sortedKeys])
+        }
+        #expect(try stripped(plain) == stripped(judged))
     }
 }

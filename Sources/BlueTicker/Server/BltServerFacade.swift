@@ -63,6 +63,7 @@ public struct BltServerContext: Sendable {
     let capexOverviewRowDecider: (any CapexOverviewRowDeciding)?
     /// 関係会社表の区分（目印の無い表だけ）。同じキーが無いときは nil（区分は unclassified のまま）。
     let relationKindDecider: (any RelationKindDeciding)?
+    let segmentReorgDecider: (any SegmentReorgDeciding)?
     /// employees / rd / goodwill / 報告セグメント指標軸が同一 doc を軸ループで再パースしないためのメモ。
     let businessSegmentDimensionCache: BusinessSegmentDimensionCache
 
@@ -83,7 +84,8 @@ public struct BltServerContext: Sendable {
         revenueRecognitionRowRoleDecider: (any RevenueRecognitionRowRoleDeciding)? = nil,
         employeesTableDecider: (any EmployeesTableDeciding)? = nil,
         capexOverviewRowDecider: (any CapexOverviewRowDeciding)? = nil,
-        relationKindDecider: (any RelationKindDeciding)? = nil
+        relationKindDecider: (any RelationKindDeciding)? = nil,
+        segmentReorgDecider: (any SegmentReorgDeciding)? = nil
     ) {
         self.cacheDir = cacheDir
         let store = EdinetCacheStore(cacheDir: edinetCacheDir(cacheDir))
@@ -108,6 +110,7 @@ public struct BltServerContext: Sendable {
         self.employeesTableDecider = employeesTableDecider
         self.capexOverviewRowDecider = capexOverviewRowDecider
         self.relationKindDecider = relationKindDecider
+        self.segmentReorgDecider = segmentReorgDecider
         self.businessSegmentDimensionCache = BusinessSegmentDimensionCache()
     }
 }
@@ -241,6 +244,9 @@ public func makeBltServerContext() async -> BltServerContext? {
     let capexOverviewRowDecider: (any CapexOverviewRowDeciding)? = decisionsClient.map {
         OpenRouterCapexOverviewRowDecider(client: $0)
     }
+    let segmentReorgDecider: (any SegmentReorgDeciding)? = decisionsClient.map {
+        OpenRouterSegmentReorgDecider(client: $0)
+    }
     let relationKindDecider: (any RelationKindDeciding)? = decisionsClient.map {
         OpenRouterRelationKindDecider(client: $0)
     }
@@ -260,7 +266,8 @@ public func makeBltServerContext() async -> BltServerContext? {
         revenueRecognitionRowRoleDecider: revenueRecognitionRowRoleDecider,
         employeesTableDecider: employeesTableDecider,
         capexOverviewRowDecider: capexOverviewRowDecider,
-        relationKindDecider: relationKindDecider)
+        relationKindDecider: relationKindDecider,
+        segmentReorgDecider: segmentReorgDecider)
 }
 
 // MARK: - REST Facade
@@ -996,6 +1003,25 @@ public extension BltServerContext {
 }
 
 public extension BltServerContext {
+    /// 再編の移り先を Jev で判定できるか（Decisions キーがあるか）。
+    var judgesSegmentReorg: Bool { segmentReorgDecider != nil }
+
+    /// 前年と当年の有報のセグメント注記を根拠に、旧区分 × 新区分を判定する。書類か注記が取れなければ空。
+    func judgeSegmentReorg(
+        _ question: SegmentReorgQuestion, previousDocID: String, docID: String,
+        skipping judged: Set<[String]>
+    ) async -> [SegmentReorgVerdict] {
+        guard let decider = segmentReorgDecider,
+            let previousDir = await downloadAnnualFilingXbrl(docID: previousDocID),
+            let currentDir = await downloadAnnualFilingXbrl(docID: docID),
+            let previousText = BreakdownExtractor.segmentNoteOverviewText(xbrlDir: previousDir),
+            let currentText = BreakdownExtractor.segmentNoteOverviewText(xbrlDir: currentDir)
+        else { return [] }
+        return await SegmentReorgJev.judge(
+            question, previousFilingText: previousText, currentFilingText: currentText,
+            skipping: judged, decider: decider)
+    }
+
     /// 内訳の1軸を、その書類の会社拡張 member の役割（Jev 判定、書類ごとに1回）を載せて解決する。
     func withSegmentMemberRoles(
         docID: String, correctionDocIDs: [String] = [],

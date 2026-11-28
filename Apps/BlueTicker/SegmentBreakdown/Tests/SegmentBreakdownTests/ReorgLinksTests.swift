@@ -68,4 +68,20 @@ struct ReorgLinksTests {
             #expect(!legend.contains(try #require(color(1, key))))
         }
     }
+
+    /// サーバーが Jev の対応（業務用システム・店舗サービス → 店舗・施設）も返すと、旧区分はすべて行き先の位置と色になる。
+    @Test func judgedLinksPlaceEveryOldSegmentAtItsDestination() throws {
+        let judged = Self.json.replacingOccurrences(
+            of: #""reorg_links":["#,
+            with: #""reorg_links":[{"from":"STORE","to":"SHOP","basis":"jev"},{"from":"BIZ","to":"SHOP","basis":"jev"},"#)
+        let response = try JSONDecoder().decode(SegmentWaterfallResponse.self, from: Data(judged.utf8))
+        let layout = StackedLayout.make(
+            columns: BreakdownBuilder.collapsingReorgs(
+                BreakdownBuilder.segmentColumns(response) { "FY\($0.fiscalYear ?? 0)" }))
+        #expect(layout.bars[1].sorted { $0.y > $1.y }.map(\.key) == ["ENE", "TEL", "CONTENT", "STORE", "BIZ"])
+        let destination = layout.bars[3].first { $0.key == "SHOP" }?.colorIndex
+        for key in ["STORE", "BIZ"] {
+            #expect(layout.bars[1].first { $0.key == key }?.colorIndex == destination)
+        }
+    }
 }
