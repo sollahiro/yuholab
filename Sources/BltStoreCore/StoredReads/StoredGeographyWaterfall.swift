@@ -28,10 +28,31 @@ package func loadStoredGeographyWaterfall(
             ? .absent : .notApplicable(reason: latestStatus)
     }
     object["latest_status"] = latestStatus
+    if fiscalYear == nil {
+        let missing = try await loadGeographyMissingYears(
+            code: code4, returned: returned, limit: max(1, years), db: db)
+        if !missing.isEmpty { object[geographyWaterfallMissingYearsKey] = missing }
+    }
     return .found(object)
+}
+
+/// 範囲の中で地域別を返せない年の連結売上高（財務取り込みの値）。抜けた年が無ければ財務は読まない。
+private func loadGeographyMissingYears(
+    code: String, returned: [[String: Any]], limit: Int, db: Database
+) async throws -> [[String: Any]] {
+    let covered = Set(returned.compactMap { $0["fiscal_year"] as? Int })
+    guard let newest = covered.max(),
+        (newest - limit + 1..<newest).contains(where: { !covered.contains($0) }),
+        let row = try await CompanyFinancials.find(code, on: db),
+        isServableCompanyFinancialsCacheVersion(row.cacheVersion)
+    else { return [] }
+    return GeographyWaterfall.missingYears(
+        covered: covered, sales: row.response.salesByYear(), limit: limit)
 }
 
 /// 最新期の地域別が実データとして読める。
 let geographyLatestStatusOk = "ok"
+/// 最新期の地域別が「セグメント情報に同じ」として省略されている（`same_as: segment`）。404 の reason にも同じ値を使う。
+let geographyLatestStatusSameAsSegment = "same_as_segment"
 /// 最新期の地域別が未取得（行が無い・公開できない）。省略（`domestic_dominant_90pct` など）以外の 404。
 let geographyLatestStatusUnavailable = "unavailable"

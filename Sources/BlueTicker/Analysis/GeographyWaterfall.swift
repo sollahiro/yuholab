@@ -38,7 +38,15 @@ public enum GeographyWaterfall {
                 SegmentWaterfall.matchesFiscalYear($0.fyEnd, query: fiscalYear)
             }
         } else {
-            selected = Array(selected.prefix(max(1, limit)))
+            // `limit` は「取れた年のうち新しい N 個」ではなく、最新の年から数えて N 会計年度の範囲。
+            // 途中の年が取れていない会社（酉島: 23・24 が無い）で、範囲の外の古い年を飛び飛びに足さない。
+            let count = max(1, limit)
+            if let newest = selected.first.flatMap({ SegmentWaterfall.fiscalYear(fyEnd: $0.fyEnd) }) {
+                selected = selected.filter {
+                    SegmentWaterfall.fiscalYear(fyEnd: $0.fyEnd).map { newest - $0 < count } ?? false
+                }
+            }
+            selected = Array(selected.prefix(count))
         }
         // 比べられる塊は、選んだ年の外の年を見ずに新しい方から決める。
         let runs = comparableRuns(selected.map { (fyEnd: $0.fyEnd, regions: regions(of: $0.payload)) })
@@ -66,6 +74,24 @@ public enum GeographyWaterfall {
             }
         }
         return ["code": code, "axis": breakdownAxisGeography, "years": objects]
+    }
+
+    /// 最新の年（`covered` の最大）から数えて `limit` 会計年度の範囲で、地域別が無く売上高がある年。新しい順。
+    public static func missingYears(
+        covered: Set<Int>, sales: [(fyEnd: String, docID: String?, sales: Double)], limit: Int
+    ) -> [[String: Any]] {
+        guard let newest = covered.max() else { return [] }
+        var seen = covered
+        return sales.sorted { $0.fyEnd > $1.fyEnd }.compactMap { year -> [String: Any]? in
+            guard let fy = SegmentWaterfall.fiscalYear(fyEnd: year.fyEnd),
+                fy < newest, newest - fy < limit, seen.insert(fy).inserted
+            else { return nil }
+            var object: [String: Any] = [
+                "fy_end": year.fyEnd, "fiscal_year": fy, "sales": breakdownJSONAmount(year.sales),
+            ]
+            if let docID = year.docID { object["doc_id"] = docID }
+            return object
+        }
     }
 
     // MARK: - 行の取り出し

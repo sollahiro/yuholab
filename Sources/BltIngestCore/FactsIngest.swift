@@ -313,8 +313,15 @@ public func runFactsIngestCommand(
                 let transitionCodes =
                     docIDs == nil
                     ? publicBreakdownListed : Set(publicBreakdownSets.keep.map(\.code))
+                var judge: SegmentReorgJudge?
+                if context.judgesSegmentReorg {
+                    judge = { question, previousDocID, docID in
+                        await context.judgeSegmentReorg(
+                            question, previousDocID: previousDocID, docID: docID)
+                    }
+                }
                 try await runSegmentTransitionIngest(
-                    db: app.db, listedCodes: transitionCodes, logger: app.logger)
+                    db: app.db, listedCodes: transitionCodes, logger: app.logger, judge: judge)
             }
             let coverage = try? await withDbRetry(
                 logger: app.logger, context: "company_breakdowns 集計"

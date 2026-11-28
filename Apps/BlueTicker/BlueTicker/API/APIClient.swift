@@ -115,7 +115,7 @@ actor APIClient {
     /// サーバーは応答の `latest_status`（200）または 404 の `reason` で伝える。どちらも無い古いサーバーは、
     /// 従来どおり `breakdown?axis=geography` を別に取って判定する。
     /// `missingReason` は `geographyMissingReason` と同じ意味（実データありは nil。省略は
-    /// `domestic_dominant_90pct` / `no_overseas_sales`、それ以外の 404 は `unavailable`、通信エラーなどは nil）。
+    /// `domestic_dominant_90pct` / `no_overseas_sales` / `same_as_segment`、それ以外の 404 は `unavailable`、通信エラーなどは nil）。
     func geographyWaterfallResult(
         code: String, years: Int = APIClient.breakdownYears
     ) async -> (response: GeographyWaterfallResponse?, missingReason: String?) {
@@ -140,7 +140,7 @@ actor APIClient {
     private static func geographyMissingReason(forStatus status: String) -> String? {
         switch status {
         case "ok": return nil
-        case "domestic_dominant_90pct", "no_overseas_sales": return status
+        case "domestic_dominant_90pct", "no_overseas_sales", "same_as_segment": return status
         default: return "unavailable"
         }
     }

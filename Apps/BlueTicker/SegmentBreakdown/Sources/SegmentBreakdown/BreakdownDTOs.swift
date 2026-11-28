@@ -15,6 +15,8 @@ struct SegmentWaterfallResponse: Codable {
         var segments: [Segment]
         /// 前年と結べなかった旧区分と新区分の組。古いサーバーには無い。
         var reorgs: [Reorg]?
+        /// 複数対複数の再編の旧区分 → 新区分の組。古いサーバーには無い。
+        var reorgLinks: [ReorgLink]?
         /// 連結合計。報告セグメントの無い年（単一セグメント）でも、あれば返る。
         var consolidated: Consolidated?
 
@@ -24,6 +26,7 @@ struct SegmentWaterfallResponse: Codable {
             case fyEnd = "fy_end"
             case lineCut = "line_cut"
             case segments, reorgs, consolidated
+            case reorgLinks = "reorg_links"
         }
     }
 
@@ -31,11 +34,19 @@ struct SegmentWaterfallResponse: Codable {
         var value: Double?
     }
 
+    struct ReorgLink: Codable {
+        var from: String?
+        var to: String?
+        var basis: String?
+    }
+
     /// `kind` は merge（旧 2 以上・新 1）/ split / replace / regroup。
     struct Reorg: Codable {
         var kind: String?
         var from: [Ref]?
         var to: [Ref]?
+        /// 旧と新の合計が近い部分集合に分けた組（regroup を分けた残り）。古いサーバーには無い。
+        var balanced: Bool?
     }
 
     struct Ref: Codable {
@@ -81,10 +92,23 @@ struct GeographyWaterfallResponse: Codable {
     var years: [Year]
     /// 直近の有報の地域別の状態。`ok`（実データあり）/ 省略の理由 / `unavailable`（未取得）。古いサーバーは無い。
     var latestStatus: String?
+    /// 範囲内で地域別が無い年と、その年の連結売上高。古いサーバーには無い。
+    var missingYears: [MissingYear]?
 
     enum CodingKeys: String, CodingKey {
         case years
         case latestStatus = "latest_status"
+        case missingYears = "missing_years"
+    }
+
+    struct MissingYear: Codable {
+        var fyEnd: String?
+        var sales: Double?
+
+        enum CodingKeys: String, CodingKey {
+            case fyEnd = "fy_end"
+            case sales
+        }
     }
 
     struct Year: Codable {

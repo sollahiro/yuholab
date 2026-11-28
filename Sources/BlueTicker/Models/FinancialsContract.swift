@@ -867,6 +867,14 @@ extension FinancialsResponse {
         return copy
     }
 
+    /// 売上高がある年の決算期末・書類・売上高（同じ決算期末は 1 行）。
+    public func salesByYear() -> [(fyEnd: String, docID: String?, sales: Double)] {
+        uniquedByFyEnd().years.compactMap { year in
+            guard let fyEnd = year.fyEnd, !fyEnd.isEmpty, let sales = year.sales else { return nil }
+            return (fyEnd, year.docId, sales)
+        }
+    }
+
     /// 同一 `fy_end` は配列先頭（新しい順の先勝ち）だけ残す。`fy_end` が空の行は落とさない。
     public func uniquedByFyEnd() -> FinancialsResponse {
         var copy = self

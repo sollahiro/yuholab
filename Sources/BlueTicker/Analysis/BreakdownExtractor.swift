@@ -3782,6 +3782,35 @@ enum BreakdownExtractor {
 
 // MARK: - SAX コレクター (private)
 
+extension BreakdownExtractor {
+    /// 報告セグメントの概要（区分の決め方・各区分の製品と子会社・区分の変更）を含む注記の冒頭。
+    /// 再編の移り先を Jev に判定させる根拠にする。注記が無ければ nil。
+    static func segmentNoteOverviewText(xbrlDir: URL, limit: Int = segmentNoteOverviewTextLimit) -> String? {
+        let tags = Xbrl.businessSegmentTextBlockTags.union(Xbrl.businessSegmentEtcTextBlockTags)
+        for root in XBRLUtils.xbrlSearchRoots(in: xbrlDir) {
+            for file in XBRLUtils.findXbrlFiles(in: root) {
+                guard let data = try? Data(contentsOf: file) else { continue }
+                let collector = TextBlockSAXCollector(targetTags: tags)
+                let parser = XMLParser(data: data)
+                parser.delegate = collector
+                parser.parse()
+                for block in collector.blocks {
+                    // 区分ごとの金額表は別の材料（区分名と売上の一覧）で渡す。説明の文だけにする。
+                    let withoutTables = block.content.replacingOccurrences(
+                        of: "(?is)<table\\b.*?</table>", with: " ",
+                        options: [.regularExpression])
+                    let text = DescriptionOfBusinessExtractor.htmlToText(withoutTables)
+                    guard let start = text.range(of: "報告セグメント") else { continue }
+                    return String(text[start.lowerBound...].prefix(limit))
+                }
+            }
+        }
+        return nil
+    }
+
+    static let segmentNoteOverviewTextLimit = 6000
+}
+
 /// 指定 local tag の TextBlock 要素のインナーコンテンツを全件収集する。
 /// EDINET の TextBlock はエスケープ済み HTML がテキストとして埋め込まれているため、
 /// foundCharacters の連結でデコード済み HTML 文字列が得られる。

@@ -341,6 +341,42 @@ import Testing
         #expect(layout.series.count == 2)
     }
 
+    // U-NEXT HD 9418: 25/08 の再編（旧5→新4）を API が 3 組（通信＋エネ→通信・エネ＋金融、コンテンツ、店舗＋業務用→店舗・施設）に分けたとき、
+    // 旧区分も最新期の大きい順（通信・エネルギー、コンテンツ、店舗・施設、金融）の位置に積み、行き先と同じ色にする。
+    @Test func reorgGroupsStackOldSegmentsAtTheirDestinations() {
+        func item(_ key: String, _ value: Double, _ link: BreakdownLink = .none) -> BreakdownItemInput {
+            BreakdownItemInput(key: key, label: key, value: value, link: link)
+        }
+        let y24 = BreakdownColumnInput(
+            label: "24/08",
+            items: [item("gyomu", 288), item("tsushin", 597), item("energy", 601), item("store", 693), item("content", 1089)])
+        let y25 = BreakdownColumnInput(
+            label: "25/08",
+            items: [item("tsushin_energy", 1568, .reorg), item("content", 1280, .reorg), item("store_facility", 953, .reorg), item("finance", 102, .reorg)],
+            groups: [
+                BreakdownReorgGroup(fromKeys: ["tsushin", "energy"], toKeys: ["tsushin_energy", "finance"], balanced: true),
+                BreakdownReorgGroup(fromKeys: ["content"], toKeys: ["content"]),
+                BreakdownReorgGroup(fromKeys: ["store", "gyomu"], toKeys: ["store_facility"]),
+            ], reorged: true)
+        let y26 = BreakdownColumnInput(
+            label: "26/08",
+            items: [
+                item("tsushin_energy", 1943, .connect("tsushin_energy")), item("content", 1440, .connect("content")),
+                item("store_facility", 1077, .connect("store_facility")), item("finance", 238, .connect("finance")),
+            ])
+        let layout = StackedLayout.make(columns: [y24, y25, y26])
+        // 下から: 通信・エネルギー系 → コンテンツ → 店舗・施設系 → 金融。
+        let order24 = layout.bars[0].sorted { $0.y > $1.y }.map(\.key)
+        #expect(Set(order24.prefix(2)) == ["tsushin", "energy"])
+        #expect(order24[2] == "content")
+        #expect(Set(order24.suffix(2)) == ["store", "gyomu"])
+        let color = Dictionary(uniqueKeysWithValues: layout.bars[0].map { ($0.key, $0.colorIndex) })
+        let newColor = Dictionary(uniqueKeysWithValues: layout.bars[2].map { ($0.key, $0.colorIndex) })
+        #expect(color["tsushin"] == newColor["tsushin_energy"])
+        #expect(color["content"] == newColor["content"])
+        #expect(color["store"] == newColor["store_facility"])
+    }
+
     // 進和 7607: 米国→米州（FY2024）、東南アジア→アジア・パシフィック（FY2025）はどちらも replace。
     @Test func reorgSourcesTakeTheColorOfTheirLatestDescendants() throws {
         let json = """

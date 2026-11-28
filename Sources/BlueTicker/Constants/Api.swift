@@ -8,6 +8,8 @@ public enum Api {
     /// セグメント注記の Decisions API。Chat Completions の `/api/v1` とは別パス。
     static let openrouterDecisionsURL = "https://openrouter.ai/api/alpha/decisions"
     static let openrouterDecisionsModel = "typesafe/jev-1.13"
+    /// 再編の移り先判定の段階。先頭から聞き、確信して選べなかったときだけ次へ進む。
+    static let openrouterReorgModels = ["liquid/d1.2", "liquid/d1.2-ultra"]
 
     /// remote バックエンドの既定 blt-server URL（契約ドキュメント・クライアント既定用。秘密情報ではない）。
     static let defaultRemoteServerURL = "https://api.yuholab.com"

@@ -901,6 +901,14 @@ import Testing
         #expect(year[segmentWaterfallLineCutKey] as? Bool == true)
     }
 
+    @Test func regroupYearCarriesNameLinks() throws {
+        let year = try object(
+            old: [row("Tel", "通信事業", 100), row("Biz", "業務用システム事業", 50)],
+            new: [row("TelEne", "通信・エネルギー事業", 90), row("Fin", "金融事業", 60)])
+        let links = try #require(year[segmentWaterfallReorgLinksKey] as? [[String: String]])
+        #expect(links == [["from": "E1:ext:Tel", "to": "E1:ext:TelEne", "basis": "name"]])
+    }
+
     @Test func oneIntoTwoIsSplitAndTwoByTwoIsRegroup() throws {
         let split = try object(
             old: [row("A", "A", 100)], new: [row("B", "B", 60), row("C", "C", 40)])
@@ -938,13 +946,15 @@ import Testing
         ]
         let year = try object(old: old, new: new)
         let reorgs = try #require(year[segmentWaterfallReorgsKey] as? [[String: Any]])
-        #expect(reorgs.count == 1)
-        let from = try #require(reorgs[0]["from"] as? [[String: Any]])
-        let to = try #require(reorgs[0]["to"] as? [[String: Any]])
-        #expect(Set(from.compactMap { $0["label"] as? String }) == ["GEM", "CI"])
-        #expect(Set(to.compactMap { $0["label"] as? String }) == ["EN", "MOB", "CI"])
+        // GEM→エナジー・モビリティ（split）と、組み替えられた同キーの CI の 2 組（前期の値どうしが 5% 以内で合う）。
+        #expect(reorgs.count == 2)
+        func labels(_ group: [String: Any], _ side: String) -> Set<String> {
+            Set((group[side] as? [[String: Any]] ?? []).compactMap { $0["label"] as? String })
+        }
+        #expect(reorgs.contains { labels($0, "from") == ["GEM"] && labels($0, "to") == ["EN", "MOB"] })
+        #expect(reorgs.contains { labels($0, "from") == ["CI"] && labels($0, "to") == ["CI"] })
         // 前期の開示と同じ値の DS は、再編に入れない。
-        #expect(!from.contains { $0["label"] as? String == "DS" })
+        #expect(!reorgs.contains { labels($0, "from").contains("DS") })
     }
 
     /// 前期列が合わない同キーの区分でも、足して合計が合わないなら再編に入れない（無関係な組替の巻き込み防止）。
@@ -986,6 +996,20 @@ import Testing
         let other = try #require(segments.first { $0["label"] as? String == "Other" })
         let prior = try #require(other[segmentWaterfallPriorKey] as? [String: Any])
         #expect((prior[segmentWaterfallPriorFromKey] as? [String]) == ["E1:ext:Others"])
+    }
+
+    /// U-NEXT HD 9418（25/08 の再編）: 旧 5 区分の値と、新 4 区分の前期値（24/08）は丸め幅では合わないが、
+    /// 同じ年の値どうしは近い。通信＋エネルギー→通信・エネルギー、店舗サービス＋業務用→店舗・施設、コンテンツ配信。
+    @Test func regroupSplitsByRestatedPriorValuesWithinTenPercent() {
+        let parts = SegmentWaterfall.splitRegroup(
+            gone: [("tsushin", 597.27), ("energy", 600.85), ("store", 692.53), ("gyomu", 287.69), ("content", 1088.81)],
+            added: [("tsushin_energy", 1133), ("content", 1097), ("store_facility", 959), ("finance", 78)],
+            tolerance: SegmentWaterfall.regroupRestatedTolerance, preferFiner: true)
+        let sets = (parts ?? []).map { ($0.from, $0.to) }
+        #expect(sets.count == 3)
+        #expect(sets.contains { $0.0 == ["tsushin", "energy"] && $0.1.contains("tsushin_energy") })
+        #expect(sets.contains { $0.0 == ["content"] && $0.1 == ["content"] })
+        #expect(sets.contains { $0.0 == ["store", "gyomu"] && $0.1.contains("store_facility") })
     }
 
     @Test func regroupUsesRestatedPriorValuesWhenNearbyTotalsAreAmbiguous() {
@@ -1142,5 +1166,16 @@ import Testing
         #expect((limited["years"] as? [[String: Any]])?.count == 3)
         let one = GeographyWaterfall.jsonObject(code: "7203", years: all, fiscalYear: "2024")
         #expect((one["years"] as? [[String: Any]])?.count == 1)
+    }
+
+    /// `limit` は最新の年から数えた会計年度の範囲。途中の年が無くても、範囲の外の古い年は足さない（酉島 6363）。
+    @Test func limitIsAFiscalYearWindowNotACountOfAvailableYears() {
+        let rows = [region("日本", 1), region("欧州", 1)]
+        let available = [2021, 2022, 2025, 2026].map {
+            (fyEnd: "\($0)-03-31", docID: "S\($0)", payload: payload(rows))
+        }
+        let object = GeographyWaterfall.jsonObject(code: "6363", years: available, limit: 5)
+        let fyEnds = (object["years"] as? [[String: Any]])?.compactMap { $0["fy_end"] as? String }
+        #expect(fyEnds == ["2026-03-31", "2025-03-31", "2022-03-31"])
     }
 }

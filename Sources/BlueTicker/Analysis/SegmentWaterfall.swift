@@ -15,6 +15,9 @@ public enum SegmentWaterfall {
         limit: Int = Api.financialsYearsDefault
     ) -> [String: Any] {
         let newestFirst = years.sorted { $0.fyEnd > $1.fyEnd }
+        // 移り先の判定の行は、年のつなぎ（prior / line_cut / 系列）には混ぜない。
+        let successors = transitions.filter { $0.decision == segmentTransitionDecisionSuccessor }
+        let transitions = transitions.filter { !segmentTransitionSuccessorDecisions.contains($0.decision) }
         let selected = selectYears(
             newestFirst, key: key, fiscalYear: fiscalYear, limit: limit, transitions: transitions)
         let previousByFyEnd = previousYearIndex(newestFirst)
@@ -29,7 +32,8 @@ public enum SegmentWaterfall {
                         newestFirst.first { $0.fyEnd == fy }
                     },
                     yearTransitions: transitions.filter { $0.fyEnd == year.fyEnd },
-                    allTransitions: transitions)
+                    allTransitions: transitions,
+                    successors: successors.filter { $0.fyEnd == year.fyEnd })
             },
         ]
     }
@@ -39,7 +43,8 @@ public enum SegmentWaterfall {
         metric: String, key: String?,
         previous: (fyEnd: String, docID: String, payload: BreakdownSnapshotPayload)? = nil,
         yearTransitions: [SegmentTransitionDraft] = [],
-        allTransitions: [SegmentTransitionDraft] = []
+        allTransitions: [SegmentTransitionDraft] = [],
+        successors: [SegmentTransitionDraft] = []
     ) -> [String: Any] {
         let seriesKeys = key.map {
             series(seed: $0, transitions: allTransitions.isEmpty ? yearTransitions : allTransitions)
@@ -91,6 +96,13 @@ public enum SegmentWaterfall {
         }
         if !reorgGroups.isEmpty {
             object[segmentWaterfallReorgsKey] = reorgGroups.map(\.json)
+        }
+        let links = reorgLinks(
+            groups: reorgGroups, previous: previous?.payload, payload: payload, successors: successors)
+        if !links.isEmpty {
+            object[segmentWaterfallReorgLinksKey] = links.map {
+                ["from": $0.fromKey, "to": $0.toKey, "basis": $0.basis]
+            }
         }
 
         if seriesKeys == nil {
@@ -294,7 +306,7 @@ public enum SegmentWaterfall {
         }
         func group(
             from: [(key: String, row: BreakdownRowPayload)],
-            to: [(key: String, row: BreakdownRowPayload)]
+            to: [(key: String, row: BreakdownRowPayload)], balanced: Bool = false
         ) -> ReorgGroup {
             let kind: String
             switch (from.count, to.count) {
@@ -303,13 +315,15 @@ public enum SegmentWaterfall {
             case (1, _): kind = segmentWaterfallReorgKindSplit
             default: kind = segmentWaterfallReorgKindRegroup
             }
-            let json: [String: Any] = [
+            var json: [String: Any] = [
                 "kind": kind,
                 "from": side(from),
                 "to": side(to),
                 "from_total": breakdownJSONAmount(total(from)),
                 "to_total": breakdownJSONAmount(total(to)),
             ]
+            // 旧と新の合計が近い部分集合に分けた組（regroup を分けた残り）。旧の一部が別の組へ移る分は含まない。
+            if balanced { json["balanced"] = true }
             return ReorgGroup(
                 kind: kind, fromKeys: from.map(\.key), toKeys: to.map(\.key), json: json)
         }
@@ -321,12 +335,18 @@ public enum SegmentWaterfall {
         let restatedNew = added.compactMap { $0.row.priorYearExternalSales?.value }
         let filedOld = gone.compactMap { $0.row.externalSales?.value }
         let exact = restatedNew.count == added.count && filedOld.count == gone.count
+        // 前期列が付いていても、旧の値と丸め幅で合うとは限らない（旧区分から一部が別の新区分へ移る再編）。
+        // 合わなければ、同じ年の値どうし（旧の値と新の前期値）の近さで分ける（今期の値より近い）。
         let parts =
             exact
-            ? splitRegroup(
+            ? (splitRegroup(
                 gone: zip(gone, filedOld).map { ($0.0.key, $0.1) },
                 added: zip(added, restatedNew).map { ($0.0.key, $0.1) },
                 tolerance: regroupExactTolerance)
+                ?? splitRegroup(
+                    gone: zip(gone, filedOld).map { ($0.0.key, $0.1) },
+                    added: zip(added, restatedNew).map { ($0.0.key, $0.1) },
+                    tolerance: regroupRestatedTolerance, preferFiner: true))
             : splitRegroup(
                 gone: gone.map { ($0.key, total([$0])) },
                 added: added.map { ($0.key, total([$0])) },
@@ -335,8 +355,68 @@ public enum SegmentWaterfall {
         return parts.map { part in
             group(
                 from: gone.filter { part.from.contains($0.key) },
-                to: added.filter { part.to.contains($0.key) })
+                to: added.filter { part.to.contains($0.key) }, balanced: true)
         }
+    }
+
+    /// 旧も新も複数の再編があった年の、旧区分 → 新区分の組。金額で分けた組をまたいで結ぶため、
+    /// その年の全部の組の旧区分と新区分から決める。split / merge / replace だけの年は組で対応が分かるので返さない。
+    static func reorgLinks(
+        groups: [ReorgGroup], previous: BreakdownSnapshotPayload?, payload: BreakdownSnapshotPayload,
+        successors: [SegmentTransitionDraft] = []
+    ) -> [SegmentReorgLink] {
+        guard let previous else { return [] }
+        let fromKeys = groups.flatMap(\.fromKeys)
+        let toKeys = groups.flatMap(\.toKeys)
+        // 年全体で旧か新が 1 区分なら、対応はもう決まっている。
+        guard Set(fromKeys).count > 1, Set(toKeys).count > 1 else { return [] }
+        func labeled(_ keys: [String], _ rows: [BreakdownRowPayload]) -> [(key: String, label: String)] {
+            keys.compactMap { key in
+                rows.first { $0.rowKind == "segment" && $0.segmentKey == key }.map { (key, $0.label) }
+            }
+        }
+        let named = SegmentReorgLinks.deterministic(
+            from: labeled(fromKeys, previous.rows), to: labeled(toKeys, payload.rows))
+        // モデルが主な移り先を選んだ旧区分は、名称で決まった対応より優先する（名称は似ているだけのことがある）。
+        let verdicts = successors.filter { $0.decision == segmentTransitionDecisionSuccessor }
+        let decided = Set(verdicts.compactMap(\.oldKey))
+        let judged = verdicts.compactMap { draft -> SegmentReorgLink? in
+            guard let from = draft.oldKey, let to = draft.newKey,
+                fromKeys.contains(from), toKeys.contains(to)
+            else { return nil }
+            return SegmentReorgLink(fromKey: from, toKey: to, basis: segmentTransitionBasisJev)
+        }
+        let kept = named.filter { !decided.contains($0.fromKey) }
+        return kept + judged.sorted { ($0.fromKey, $0.toKey) < ($1.fromKey, $1.toKey) }
+    }
+
+    /// Jev に聞く再編年の問い。旧区分 1 つにつき「主な移り先」を聞く。
+    /// 聞くのは、複数の新区分に分かれる regroup の旧区分のうち、新しい年に同じキーの区分がないもの。
+    /// 旧 1・新 1 や、金額で新区分 1 つに決まった組は聞かない。
+    public static func reorgQuestion(
+        fyEnd: String,
+        previous: (fyEnd: String, docID: String, payload: BreakdownSnapshotPayload),
+        payload: BreakdownSnapshotPayload, transitions: [SegmentTransitionDraft]
+    ) -> SegmentReorgQuestion? {
+        let groups = reorgGroups(
+            fyEnd: fyEnd, previous: previous, payload: payload,
+            metric: segmentWaterfallMetricExternalSales, transitions: transitions)
+        let regroups = groups.filter { $0.kind == segmentWaterfallReorgKindRegroup }
+        guard !regroups.isEmpty else { return nil }
+        func segment(_ key: String, _ rows: [BreakdownRowPayload]) -> SegmentReorgQuestion.Segment? {
+            rows.first { $0.rowKind == "segment" && $0.segmentKey == key }.map {
+                SegmentReorgQuestion.Segment(
+                    key: key, label: $0.label, sales: $0.externalSales?.value,
+                    priorSales: $0.priorYearExternalSales?.value)
+            }
+        }
+        let newKeys = Set(payload.rows.filter { $0.rowKind == "segment" }.compactMap(\.segmentKey))
+        let askedKeys = regroups.flatMap(\.fromKeys).filter { !newKeys.contains($0) }
+        let old = askedKeys.compactMap { segment($0, previous.payload.rows) }
+        let new = regroups.flatMap(\.toKeys).compactMap { segment($0, payload.rows) }
+        guard !old.isEmpty, new.count >= 2 else { return nil }
+        let allOld = groups.flatMap(\.fromKeys).compactMap { segment($0, previous.payload.rows) }
+        return SegmentReorgQuestion(fyEnd: fyEnd, old: old, new: new, allOld: allOld)
     }
 
     /// regroup を、旧の合計と新の合計が近い部分集合の組に分ける。
@@ -346,10 +426,13 @@ public enum SegmentWaterfall {
     static let regroupSplitTolerance = 0.10
     /// 前期列の値で分けるときの許容（丸め幅の累積に収まる 0.1%）。
     static let regroupExactTolerance = 0.001
+    /// 前期列の値と旧の値が丸め幅では合わないとき（旧区分の一部が別の新区分へ移る再編）の許容。
+    /// 同じ年の値どうしなので、今期の値で分ける 10% より厳しくする。
+    static let regroupRestatedTolerance = 0.05
 
     static func splitRegroup(
         gone: [(key: String, value: Double)], added: [(key: String, value: Double)],
-        tolerance: Double
+        tolerance: Double, preferFiner: Bool = false
     ) -> [(from: Set<String>, to: Set<String>)]? {
         guard gone.count >= 2, gone.count <= 6, added.count >= 2, added.count <= 6 else {
             return nil
@@ -388,10 +471,17 @@ public enum SegmentWaterfall {
                         worst = max(worst, abs(fromTotals[block] - toTotals[block]) / base)
                     }
                     guard worst <= tolerance else { return }
-                    if let current = best,
-                        current.score < worst
+                    if let current = best {
+                        // 通常は差が最小の分け方。`preferFiner` は、許容に収まる中で最も細かく分ける
+                        // （旧区分ごとの行き先を、できるだけ細かく決める）。
+                        if preferFiner {
+                            if current.blocks > blockCount
+                                || (current.blocks == blockCount && current.score <= worst)
+                            { return }
+                        } else if current.score < worst
                             || (current.score == worst && current.blocks >= blockCount)
-                    { return }
+                        { return }
+                    }
                     var parts: [(from: Set<String>, to: Set<String>)] = Array(
                         repeating: ([], []), count: blockCount)
                     for (index, block) in assignment.enumerated() {

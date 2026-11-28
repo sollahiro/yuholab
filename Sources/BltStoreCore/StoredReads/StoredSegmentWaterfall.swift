@@ -80,6 +80,10 @@ package func loadServableBreakdownYearsWithLatest(
             latest = "unavailable"
         } else {
             latest = latestRow.notApplicableReason
+            // 地域ごとの情報がセグメント情報と同じとして省略された書類（行は無く `same_as` だけ）。
+            if latest == nil, axis == breakdownAxisGeography, latestRow.payload.sameAs != nil {
+                latest = geographyLatestStatusSameAsSegment
+            }
         }
     } else {
         latest = "unavailable"
