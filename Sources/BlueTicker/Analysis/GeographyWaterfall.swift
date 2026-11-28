@@ -38,7 +38,15 @@ public enum GeographyWaterfall {
                 SegmentWaterfall.matchesFiscalYear($0.fyEnd, query: fiscalYear)
             }
         } else {
-            selected = Array(selected.prefix(max(1, limit)))
+            // `limit` は「取れた年のうち新しい N 個」ではなく、最新の年から数えて N 会計年度の範囲。
+            // 途中の年が取れていない会社（酉島: 23・24 が無い）で、範囲の外の古い年を飛び飛びに足さない。
+            let count = max(1, limit)
+            if let newest = selected.first.flatMap({ SegmentWaterfall.fiscalYear(fyEnd: $0.fyEnd) }) {
+                selected = selected.filter {
+                    SegmentWaterfall.fiscalYear(fyEnd: $0.fyEnd).map { newest - $0 < count } ?? false
+                }
+            }
+            selected = Array(selected.prefix(count))
         }
         // 比べられる塊は、選んだ年の外の年を見ずに新しい方から決める。
         let runs = comparableRuns(selected.map { (fyEnd: $0.fyEnd, regions: regions(of: $0.payload)) })
