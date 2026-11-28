@@ -24,7 +24,7 @@ import Testing
         let hitachi = SegmentReorgLinks.deterministic(
             from: [("GEM", "グリーンエナジー＆モビリティ")],
             to: [("EN", "エナジー"), ("MOB", "モビリティ")])
-        #expect(hitachi.map(\.toKey) == ["MOB"])
+        #expect(hitachi.map(\.toKey) == ["EN", "MOB"])
         let media = SegmentReorgLinks.deterministic(
             from: [("XRSNS", "Xr／Sns事業")], to: [("SNS", "SNS事業"), ("XR", "XR事業")])
         #expect(media.map(\.toKey) == ["SNS", "XR"])

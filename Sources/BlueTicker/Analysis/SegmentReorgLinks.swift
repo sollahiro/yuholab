@@ -33,7 +33,9 @@ public enum SegmentReorgLinks {
             }
             let oldParts = nameParts(old.label)
             for new in to where !shared.contains(new.key) {
-                guard !oldParts.isDisjoint(with: nameParts(new.label)) else { continue }
+                let newParts = nameParts(new.label)
+                guard oldParts.contains(where: { part in newParts.contains { matches(part, $0) } })
+                else { continue }
                 links.append(
                     SegmentReorgLink(
                         fromKey: old.key, toKey: new.key, basis: segmentWaterfallReorgLinkBasisName))
@@ -49,8 +51,15 @@ public enum SegmentReorgLinks {
     private static let nameSuffixes = ["セグメント", "事業", "部門", "分野", "関連"]
     private static let nameSeparators = CharacterSet(charactersIn: "・&/、,")
 
+    /// 丸ごと一致、または片方がもう片方で終わる（グリーンエナジー → エナジー）。後ろ側の一致は 3 文字以上だけ。
+    private static func matches(_ a: String, _ b: String) -> Bool {
+        if a == b { return true }
+        let (short, long) = a.count < b.count ? (a, b) : (b, a)
+        return short.count >= 3 && long.hasSuffix(short)
+    }
+
     /// 区分名を「・」「＆」「／」などで区切った要素。末尾の「事業」等は落とし、全半角と大小文字はそろえる。
-    /// 要素は丸ごと一致で比べる（「店舗サービス」と「店舗・施設ソリューション」は結ばない）。
+    /// 語の一部（前や中）の一致では結ばない（「店舗サービス」と「店舗・施設ソリューション」）。
     static func nameParts(_ label: String) -> Set<String> {
         let folded = label.precomposedStringWithCompatibilityMapping.lowercased()
             .filter { !$0.isWhitespace }

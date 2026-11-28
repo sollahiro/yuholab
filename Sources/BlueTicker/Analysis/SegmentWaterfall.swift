@@ -353,7 +353,7 @@ public enum SegmentWaterfall {
         guard let previous else { return [] }
         let fromKeys = groups.flatMap(\.fromKeys)
         let toKeys = groups.flatMap(\.toKeys)
-        // 組が 1 つで旧か新が 1 区分なら、対応はもう決まっている。
+        // 年全体で旧か新が 1 区分なら、対応はもう決まっている。
         guard Set(fromKeys).count > 1, Set(toKeys).count > 1 else { return [] }
         func labeled(_ keys: [String], _ rows: [BreakdownRowPayload]) -> [(key: String, label: String)] {
             keys.compactMap { key in
