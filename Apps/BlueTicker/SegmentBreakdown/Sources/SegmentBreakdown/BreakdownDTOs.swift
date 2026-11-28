@@ -15,6 +15,8 @@ struct SegmentWaterfallResponse: Codable {
         var segments: [Segment]
         /// 前年と結べなかった旧区分と新区分の組。古いサーバーには無い。
         var reorgs: [Reorg]?
+        /// 複数対複数の再編の旧区分 → 新区分の組。古いサーバーには無い。
+        var reorgLinks: [ReorgLink]?
         /// 連結合計。報告セグメントの無い年（単一セグメント）でも、あれば返る。
         var consolidated: Consolidated?
 
@@ -24,11 +26,17 @@ struct SegmentWaterfallResponse: Codable {
             case fyEnd = "fy_end"
             case lineCut = "line_cut"
             case segments, reorgs, consolidated
+            case reorgLinks = "reorg_links"
         }
     }
 
     struct Consolidated: Codable {
         var value: Double?
+    }
+
+    struct ReorgLink: Codable {
+        var from: String?
+        var to: String?
     }
 
     /// `kind` は merge（旧 2 以上・新 1）/ split / replace / regroup。

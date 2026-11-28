@@ -34,7 +34,7 @@ enum BreakdownBuilder {
                     || (year.lineCut == true && items.contains { $0.link == .none }))
             return BreakdownColumnInput(
                 label: columnLabel(year), items: items, groups: index == 0 ? [] : groups(year),
-                reorged: reorged)
+                links: index == 0 ? [] : links(year), reorged: reorged)
         }
     }
 
@@ -45,6 +45,14 @@ enum BreakdownBuilder {
             let to = (reorg.to ?? []).compactMap(\.segmentKey)
             guard !from.isEmpty, !to.isEmpty else { return nil }
             return BreakdownReorgGroup(fromKeys: from, toKeys: to)
+        }
+    }
+
+    /// API の `reorg_links[]`（複数対複数の再編で、どの旧区分がどの新区分へ移ったか）。
+    private static func links(_ year: SegmentWaterfallResponse.Year) -> [BreakdownReorgLink] {
+        (year.reorgLinks ?? []).compactMap { link in
+            guard let from = link.from, let to = link.to else { return nil }
+            return BreakdownReorgLink(fromKey: from, toKey: to)
         }
     }
 

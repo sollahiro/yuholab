@@ -467,7 +467,9 @@ public func apiSkillsCatalog() -> [ApiSkill] {
                 年に再編があれば reorgs[]（kind は merge / split / replace / regroup、from は前年に開示された
                 旧区分、to は当年の新区分、from_total / to_total は各側の合計）が付き、新区分の行の
                 prior.from に旧区分の segment_key が入る。旧→新の対応は旧 k・新 1（merge）と旧 1・新 n（split）だけ
-                決める。複数対複数（regroup）は対応を決めず全行を並べる。終了・新規だけの年は reorgs を出さない。
+                決める。複数対複数（regroup）は組では全行を並べる。終了・新規だけの年は reorgs を出さない。
+                旧も新も複数の年で移り先が分かる行は reorg_links[]（from / to は segment_key、basis は
+                same_key / name）に出す。多対多で、組をまたぐことがある。載らない行の移り先は分からない。
                 metric は external_sales / profit / segment_assets / capital_expenditures /
                 noncurrent_asset_additions（省略時 external_sales）。
                 key または segment_key を付けるとそのキーの系列（rename でキーが変わった年も含む）。
