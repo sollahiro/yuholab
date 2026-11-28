@@ -91,6 +91,23 @@ import Testing
         #expect(rows(dentsu) == 4)
     }
 
+    /// 列が地域の売上表(型A)。source: code=2776 doc_id=S100VL2N page=0 field=geography 日本11,054,172 中国1,225,124 その他17,504 合計12,296,801(千円)
+    @Test func regionColumnSalesTableIsRecognized() {
+        let table = BreakdownTable(
+            heading: "２．地域ごとの情報",
+            markdown: "| | 日本 | 中国 | その他 | 合計 |\n|---|---|---|---|---|\n| 売上高 | 11,054,172 | 1,225,124 | 17,504 | 12,296,801 |", period: "当期")
+        #expect(BreakdownExtractor.tableHasRegionColumnHeaders(table))
+        // 列が事業の表、列数が少ない表は対象外
+        let business = BreakdownTable(
+            heading: "報告セグメント",
+            markdown: "| | 食品 | 機械 | 合計 |\n|---|---|---|---|\n| 売上高 | 1 | 2 | 3 |", period: "当期")
+        #expect(!BreakdownExtractor.tableHasRegionColumnHeaders(business))
+        let two = BreakdownTable(
+            heading: "地域",
+            markdown: "| | 日本 | 合計 |\n|---|---|---|\n| 売上高 | 1 | 2 |", period: "当期")
+        #expect(!BreakdownExtractor.tableHasRegionColumnHeaders(two))
+    }
+
     @Test func regionTableWithAustraliaRowCountsAsGeographyTable() {
         let table = BreakdownTable(
             heading: "4.地域別に関する情報", markdown: "| 地域 | 外部顧客への売上高 |\n|---|---|\n| 国内(日本) | 17,089,485 |\n| 豪州 | 9,237,950 |\n| その他 | 48,191 |\n| 計 | 26,375,627 |", period: "当期")

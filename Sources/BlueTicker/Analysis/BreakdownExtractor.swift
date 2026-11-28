@@ -1393,8 +1393,52 @@ enum BreakdownExtractor {
                 // 前期の表しか拾えないときは採用しない（従来の same_as 経路に戻す）。
                 if !geographyTablesAreAllPriorPeriod(jgaapResult) { return jgaapResult }
             }
+            // 地域専用タグが無く、セグメント注記に「地域ごとの情報（1）売上高」の表（列=地域）だけがある型
+            // （2776 S100VL2N / 3556 S100UZQY。見出し「２．地域ごとの情報」の直後）。
+            let columnTables = jgaapSegmentNoteRegionColumnTables(xbrlDir: xbrlDir)
+            if !columnTables.isEmpty {
+                let columnResult = buildResult(
+                    xbrlDir: xbrlDir, tables: columnTables,
+                    dimensionKeywords: Xbrl.geographyDimensionKeywords)
+                if !geographyTablesAreAllPriorPeriod(columnResult) { return columnResult }
+            }
         }
         return result
+    }
+
+    /// 列が地域の売上表（見出し行に 日本/国内/本邦 の列があり、データ列が3つ以上）か。
+    /// 有形固定資産の同形の表は、見出しと直前キャプションの除外で落とす（`mixedSkipNearestAssetCaptionTables`）。
+    static func tableHasRegionColumnHeaders(_ table: BreakdownTable) -> Bool {
+        for line in table.markdown.split(separator: "\n", omittingEmptySubsequences: false) {
+            let trimmed = String(line).trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("|") else { continue }
+            if trimmed.contains("---") { return false }
+            let cells = trimmed.split(separator: "|", omittingEmptySubsequences: true)
+                .map { String($0).filter { !$0.isWhitespace } }
+            let dataColumns = cells.dropFirst().filter { !$0.isEmpty }
+            guard dataColumns.count >= 3 else { continue }
+            if dataColumns.contains(where: { ["日本", "国内", "本邦"].contains(where: $0.contains) }) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// J-GAAP セグメント注記の「地域ごとの情報」見出しの下にある、列が地域の売上表。
+    /// 報告セグメントが地域区分の会社はセグメントがそのまま地域別（same_as: segment）なので使わない。
+    static func jgaapSegmentNoteRegionColumnTables(xbrlDir: URL) -> [BreakdownTable] {
+        if reportableSegmentsAreGeographic(xbrlDir: xbrlDir) { return [] }
+        return extractFromTextBlocks(
+            xbrlDir: xbrlDir,
+            dedicatedTags: [],
+            mixedTags: Xbrl.jgaapSegmentNoteGeographyFallbackTextBlockTags,
+            dedicatedHeading: "地域ごとの情報",
+            mixedKeywords: ["地域ごとの情報"],
+            skipGeographyAssetMetricTables: true,
+            mixedHeadingLikeOnly: true,
+            dropOfWhichRegionColumns: true,
+            mixedSkipNearestAssetCaptionTables: true
+        ).filter(tableHasRegionColumnHeaders)
     }
 
     /// 地域の表が前期のものだけで、当期の表が無い（ダイキン S100OG1V: 前期の比較表だけが残る）。
