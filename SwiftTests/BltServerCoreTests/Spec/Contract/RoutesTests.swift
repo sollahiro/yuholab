@@ -419,6 +419,29 @@ private func send(
         }
     }
 
+    /// 直近の有報が地域ごとの情報を「セグメント情報に同じ」として省略（same_as）しているときは、
+    /// 年次推移も `same_as_segment` の 404。アプリは専用カードを出す。
+    @Test func geographyWaterfallReturns404WithSameAsSegmentReason() async throws {
+        try await withApp(databases: true) { app in
+            let row = CompanyBreakdown(docID: "S1", axis: breakdownAxisGeography)
+            row.code = "7203"
+            row.submitDateTime = "2025-06-20 09:00"
+            row.payload = BreakdownSnapshotPayload(
+                axis: breakdownAxisGeography, denominator: 0, denominatorTag: "", rows: [],
+                sourceKind: breakdownSourceSameAs, needsReview: false, warnings: [],
+                sameAs: breakdownAxisSegment)
+            row.needsReview = false
+            row.source = breakdownSourceSameAs
+            row.contentHash = ""
+            row.cacheVersion = geographyBreakdownCacheVersion
+            try await row.create(on: app.db)
+
+            let (status, json) = try await send(app, "/v1/companies/7203/waterfall/geography")
+            #expect(status == .notFound)
+            #expect(json?["reason"] as? String == "same_as_segment")
+        }
+    }
+
     @Test func segmentWaterfallRejectsUnknownMetric() async throws {
         try await withApp(databases: true) { app in
             let (status, json) = try await send(

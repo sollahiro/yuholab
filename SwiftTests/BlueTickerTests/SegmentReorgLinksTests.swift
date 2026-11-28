@@ -37,3 +37,16 @@ import Testing
         #expect(links.isEmpty)
     }
 }
+
+@Suite struct GeographyMissingYearsTests {
+    // 酉島 6363: 地域別があるのは 22・25・26。範囲は 26 から数えた 5 年。
+    @Test func listsOnlyYearsInsideTheWindowWithoutGeography() {
+        let sales: [(fyEnd: String, docID: String?, sales: Double)] = [
+            ("2026-03-31", "A", 929), ("2025-03-31", "B", 865), ("2024-03-31", "C", 811),
+            ("2023-03-31", "D", 647), ("2022-03-31", "E", 522), ("2021-03-31", "F", 508),
+        ]
+        let missing = GeographyWaterfall.missingYears(
+            covered: [2026, 2025, 2022], sales: sales, limit: 5)
+        #expect(missing.compactMap { $0["fiscal_year"] as? Int } == [2024, 2023])
+    }
+}

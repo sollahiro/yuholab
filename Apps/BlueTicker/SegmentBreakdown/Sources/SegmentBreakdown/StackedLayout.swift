@@ -43,6 +43,9 @@ struct BreakdownColumnInput: Equatable {
     var links: [BreakdownReorgLink] = []
     /// この年に区分の再編があった（年ラベルの下に小さく「再編」を出す）。1 本に集約した再編も含む。
     var reorged: Bool = false
+
+    /// 地域別が無く、連結売上高だけの年。
+    var isMissingYear: Bool { items.count == 1 && items.first?.key == missingRegionKey }
 }
 
 /// 棒の中に出す文字の元。
@@ -95,6 +98,10 @@ struct BreakdownLayout: Equatable {
 
 /// 報告セグメントが無い年（単一セグメント）の棒のキー。系列の色は付けない。
 let singleSegmentKey = "single|total"
+/// 地域別が無い年の、連結売上高 1 本の棒。
+let missingRegionKey = "missing|total"
+/// 系列の色も積み順も持たない棒。
+private let neutralKeys: Set<String> = [singleSegmentKey, missingRegionKey]
 
 enum StackedLayout {
     static let barWidthRatio = 0.6
@@ -176,7 +183,7 @@ enum StackedLayout {
         var position: [String: Int] = [:]
         var palette = 0
         for seen in ordered {
-            if seen.id == singleSegmentKey {
+            if neutralKeys.contains(seen.id) {
                 position[seen.id] = -1
             } else {
                 position[seen.id] = palette
@@ -234,7 +241,7 @@ enum StackedLayout {
         }
         var rootColor: [String: Int] = [:]
         var colorUse = Array(repeating: 0, count: paletteSize)
-        for seen in ordered where seen.id != singleSegmentKey {
+        for seen in ordered where !neutralKeys.contains(seen.id) {
             let root = colorRoot(seen.id)
             guard rootColor[root] == nil else { continue }
             var others = coexisting[root] ?? []
@@ -248,7 +255,7 @@ enum StackedLayout {
         }
         var colorIndex: [String: Int] = [:]
         for seen in ordered {
-            colorIndex[seen.id] = seen.id == singleSegmentKey ? -1 : (rootColor[colorRoot(seen.id)] ?? 0)
+            colorIndex[seen.id] = neutralKeys.contains(seen.id) ? -1 : (rootColor[colorRoot(seen.id)] ?? 0)
         }
         let series = ordered.map {
             BreakdownSeries(id: $0.id, label: $0.label, colorIndex: colorIndex[$0.id] ?? 0)
@@ -272,7 +279,7 @@ enum StackedLayout {
             }
         }
         var marks: [[String: BreakdownMark]] = Array(repeating: [:], count: n)
-        for k in 1..<n {
+        for k in 1..<n where !columns[k].isMissingYear && !columns[k - 1].isMissingYear {
             let hasReorg = items[k].contains { $0.link == .reorg && !groupedTo[k].contains($0.key) }
             var referenced = Set<String>()
             for item in items[k] {
@@ -304,19 +311,23 @@ enum StackedLayout {
             for (rank, item) in bySize.enumerated() {
                 // 位置の差が付くよう、つながり先の位置を整数、同じ先の中の大きい順を小数で足す。
                 let own = Double(rank) / 1000
-                guard k + 1 < n else { slot[item.key] = Double(rank); continue }
-                let next = stacked[k + 1]
+                // 地域別が無い年は飛ばして、その次の年の並びに合わせる。
+                guard let after = (k + 1..<n).first(where: { !columns[$0].isMissingYear }) else {
+                    slot[item.key] = Double(rank)
+                    continue
+                }
+                let next = stacked[after]
                 var targets: [Int] = []
                 for (index, candidate) in next.enumerated() {
                     if case .connect(let from) = candidate.link, from == item.key { targets.append(index) }
                 }
                 // 移り先が分かる年は、その組だけに位置を合わせる。分からない行は組の全部には寄せない。
-                let links = columns[k + 1].links
+                let links = columns[after].links
                 for (index, candidate) in next.enumerated()
                 where links.contains(where: { $0.fromKey == item.key && $0.toKey == candidate.key }) {
                     targets.append(index)
                 }
-                for group in columns[k + 1].groups
+                for group in columns[after].groups
                 where group.fromKeys.contains(item.key) && !(group.isRegroup && !links.isEmpty) {
                     // 移り先が分かっている行は、金額で分けた組の相手には寄せない。
                     guard !links.contains(where: { $0.fromKey == item.key }) else { continue }

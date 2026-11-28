@@ -207,6 +207,8 @@ public let segmentWaterfallPriorFromKey = "from"
 public let segmentTransitionMatchedRestated = "restated"
 /// 年の再編の組（旧区分 → 新区分）。再編が無い年は出さない。
 public let segmentWaterfallReorgsKey = "reorgs"
+/// 地域別の年次推移で、範囲の中の地域別が無い年と、その年の連結売上高。
+public let geographyWaterfallMissingYearsKey = "missing_years"
 public let segmentWaterfallReorgKindReplace = "replace"
 public let segmentWaterfallReorgKindMerge = "merge"
 public let segmentWaterfallReorgKindSplit = "split"

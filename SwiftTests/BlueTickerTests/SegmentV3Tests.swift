@@ -1143,4 +1143,15 @@ import Testing
         let one = GeographyWaterfall.jsonObject(code: "7203", years: all, fiscalYear: "2024")
         #expect((one["years"] as? [[String: Any]])?.count == 1)
     }
+
+    /// `limit` は最新の年から数えた会計年度の範囲。途中の年が無くても、範囲の外の古い年は足さない（酉島 6363）。
+    @Test func limitIsAFiscalYearWindowNotACountOfAvailableYears() {
+        let rows = [region("日本", 1), region("欧州", 1)]
+        let available = [2021, 2022, 2025, 2026].map {
+            (fyEnd: "\($0)-03-31", docID: "S\($0)", payload: payload(rows))
+        }
+        let object = GeographyWaterfall.jsonObject(code: "6363", years: available, limit: 5)
+        let fyEnds = (object["years"] as? [[String: Any]])?.compactMap { $0["fy_end"] as? String }
+        #expect(fyEnds == ["2026-03-31", "2025-03-31", "2022-03-31"])
+    }
 }

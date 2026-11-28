@@ -179,7 +179,28 @@ enum BreakdownBuilder {
         var columns: [BreakdownColumnInput] = []
         var previousGroup: Int?
         var previousMembers: [String: [String]?] = [:]
+        // 地域別が無い年は、連結売上高の 1 本を決算期末の順に挟む（古い順）。
+        var missing = (response.missingYears ?? [])
+            .compactMap { year -> (fyEnd: String, sales: Double)? in
+                guard let fyEnd = year.fyEnd, let sales = year.sales, sales > 0 else { return nil }
+                return (fyEnd, sales)
+            }
+            .sorted { $0.fyEnd < $1.fyEnd }
+        func appendMissing(before fyEnd: String?) {
+            while let next = missing.first, fyEnd.map({ next.fyEnd < $0 }) ?? true {
+                missing.removeFirst()
+                let stub = GeographyWaterfallResponse.Year(fyEnd: next.fyEnd)
+                columns.append(
+                    BreakdownColumnInput(
+                        label: columnLabel(stub),
+                        items: [
+                            BreakdownItemInput(
+                                key: missingRegionKey, label: "地域別なし", value: next.sales, link: .none)
+                        ]))
+            }
+        }
         for year in response.years.reversed() {
+            appendMissing(before: year.fyEnd)
             let blocks = year.comparableRegions ?? []
             guard !blocks.isEmpty else { continue }
             let group = year.comparableGroup
@@ -199,12 +220,17 @@ enum BreakdownBuilder {
                     key: block.region, label: regionLabel(block, in: year), value: value, link: link)
             }
             guard !items.isEmpty else { continue }
+            // 抜けた年をはさむと塊の番号は必ず変わるので、区分が違うときだけ「再編」にする。
+            let afterGap = columns.last?.isMissingYear == true
+            let reorged =
+                previousGroup != nil && !sameGroup
+                && !(afterGap && Set(previousMembers.keys) == Set(members.keys))
             columns.append(
-                BreakdownColumnInput(
-                    label: columnLabel(year), items: items, reorged: previousGroup != nil && !sameGroup))
+                BreakdownColumnInput(label: columnLabel(year), items: items, reorged: reorged))
             previousGroup = group
             previousMembers = members
         }
+        appendMissing(before: nil)
         return columns
     }
 

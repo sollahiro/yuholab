@@ -567,7 +567,9 @@ public func apiSkillsCatalog() -> [ApiSkill] {
             ],
             instructions: """
                 単年の表は get-breakdown?axis=geography。格納済みデータのみ。未算出は 404、DB 非接続は 503。
-                直近の有報の状態は 200 の latest_status（ok / 省略の理由 / unavailable）と、404 の reason で返す。
+                直近の有報の状態は 200 の latest_status（ok / 省略の理由 / same_as_segment＝セグメント情報に同じとして省略 / unavailable）と、404 の reason で返す。
+                years の範囲は最新の年から数えた会計年度です。範囲内で地域別が無い年は years[] に入れず、
+                missing_years[]（fy_end / fiscal_year / doc_id / sales＝連結売上高）に出します。
                 例: GET /v1/companies/7203/waterfall/geography
                 例: GET /v1/companies/7203/waterfall/geography?fiscal_year=2026
                 """

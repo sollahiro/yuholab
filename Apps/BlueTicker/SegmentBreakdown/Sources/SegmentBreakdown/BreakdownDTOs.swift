@@ -89,10 +89,23 @@ struct GeographyWaterfallResponse: Codable {
     var years: [Year]
     /// 直近の有報の地域別の状態。`ok`（実データあり）/ 省略の理由 / `unavailable`（未取得）。古いサーバーは無い。
     var latestStatus: String?
+    /// 範囲内で地域別が無い年と、その年の連結売上高。古いサーバーには無い。
+    var missingYears: [MissingYear]?
 
     enum CodingKeys: String, CodingKey {
         case years
         case latestStatus = "latest_status"
+        case missingYears = "missing_years"
+    }
+
+    struct MissingYear: Codable {
+        var fyEnd: String?
+        var sales: Double?
+
+        enum CodingKeys: String, CodingKey {
+            case fyEnd = "fy_end"
+            case sales
+        }
     }
 
     struct Year: Codable {
