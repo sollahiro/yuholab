@@ -49,7 +49,7 @@ struct BreakdownModel {
     var regionIsSegment = false
 
     /// 直近 5 年（取れる分だけ）。
-    static let years = 5
+    static let years = APIClient.breakdownYears
 
     /// 失敗や 404 はカードを出さないだけ（分析ページ全体のエラーにしない）。
     /// 取れたところから `update` で順に渡す（セグメントの棒 → 利益 → 地域）。全部そろうのを待たない。

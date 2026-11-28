@@ -47,6 +47,18 @@ package func loadServableSegmentYears(
 package func loadServableBreakdownYears(
     code: String, axis: String, db: Database
 ) async throws -> [(fyEnd: String, docID: String, payload: BreakdownSnapshotPayload)] {
+    try await loadServableBreakdownYearsWithLatest(code: code, axis: axis, db: db).years
+}
+
+/// `loadServableBreakdownYears` と同じ年の並びに、直近の有報の状態（`breakdown` を doc_id 無しで引いたときの結果）を添える。
+/// 同じ候補行・書類照会を使い回すので、状態のための追加の DB 読みは無い。
+/// `latest` は、実データなら nil、省略（`not_applicable_reason`）ならその reason、行が無い・公開できないなら `unavailable`。
+package func loadServableBreakdownYearsWithLatest(
+    code: String, axis: String, db: Database
+) async throws -> (
+    years: [(fyEnd: String, docID: String, payload: BreakdownSnapshotPayload)],
+    latest: String?
+) {
     let candidates = try await CompanyBreakdown.query(on: db)
         .filter(\.$code == code)
         .filter(\.$axis == axis)
@@ -54,6 +66,24 @@ package func loadServableBreakdownYears(
         .all()
     let companyDocIDs = try await companyDisclosureDocIDs(
         among: candidates.map(\.docID), db: db)
+    // 直近の有報（提出の新しい方で、読める版の行）。`loadStoredBreakdown` の doc_id 無しと同じ選び方。
+    let latestRow = candidates.reversed().first {
+        isServableBreakdown(source: $0.source, cacheVersion: $0.cacheVersion, axis: axis)
+            && companyDocIDs.contains($0.docID)
+    }
+    var latest: String?
+    if let latestRow {
+        if !isPubliclyServableBreakdown(
+            source: latestRow.source, needsReview: latestRow.needsReview || latestRow.payload.needsReview,
+            warnings: latestRow.payload.warnings, rows: latestRow.payload.rows, axis: axis)
+        {
+            latest = "unavailable"
+        } else {
+            latest = latestRow.notApplicableReason
+        }
+    } else {
+        latest = "unavailable"
+    }
     let servable = candidates.filter {
         isServableBreakdown(
             source: $0.source, cacheVersion: $0.cacheVersion, axis: axis)
@@ -77,7 +107,8 @@ package func loadServableBreakdownYears(
         if let existing = unique[fyEnd], existing.submit > row.submitDateTime { continue }
         unique[fyEnd] = (fyEnd: fyEnd, docID: row.docID, payload: row.payload, submit: row.submitDateTime)
     }
-    return unique.values
+    let years = unique.values
         .sorted { $0.fyEnd > $1.fyEnd }
         .map { (fyEnd: $0.fyEnd, docID: $0.docID, payload: $0.payload) }
+    return (years, latest)
 }

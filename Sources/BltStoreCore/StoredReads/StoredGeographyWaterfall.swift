@@ -10,18 +10,12 @@ package func loadStoredGeographyWaterfall(
     let code4 = String(code.prefix(4))
     guard !code4.isEmpty, code4.allSatisfy({ $0.isLetter || $0.isNumber }) else { return .absent }
     if fiscalYear == nil, years <= 0 { return .absent }
-    let snapshots = try await loadServableBreakdownYears(
-        code: code4, axis: breakdownAxisGeography, db: db)
     // 直近の有報の地域別が省略・未取得か。年次推移は省略された年を落とすので、
-    // 古い年の実データを最新のように見せないよう、最新期の状態を応答に載せる（呼び出し側が別に問い合わせなくて済む）。
-    let latestStatus: String
-    switch try await loadStoredBreakdown(
-        code: code4, docId: nil, axis: breakdownAxisGeography, db: db)
-    {
-    case .found: latestStatus = geographyLatestStatusOk
-    case .notApplicable(let reason): latestStatus = reason
-    case .withheld, .absent: latestStatus = geographyLatestStatusUnavailable
-    }
+    // 古い年の実データを最新のように見せないよう、最新期の状態を応答に載せる
+    // （呼び出し側が別に問い合わせなくて済む。年と同じ候補行から出すので DB の追加読みは無い）。
+    let (snapshots, latest) = try await loadServableBreakdownYearsWithLatest(
+        code: code4, axis: breakdownAxisGeography, db: db)
+    let latestStatus = latest ?? geographyLatestStatusOk
     guard !snapshots.isEmpty else {
         return latestStatus == geographyLatestStatusOk
             ? .absent : .notApplicable(reason: latestStatus)
