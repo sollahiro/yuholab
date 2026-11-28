@@ -123,7 +123,8 @@ enum Format {
     /// 「ホールディングス」で言い切るときだけ HD。直前の「・」は残さない。
     /// 途中の「ホールディングス・アンド…」は触らない。
     static func displayName(_ name: String, fallback: String = "") -> String {
-        var stripped = name
+        var stripped = halfwidthASCII(name)
+            .replacingOccurrences(of: "\\bHoldings\\b", with: "HD", options: [.regularExpression, .caseInsensitive])
             .replacingOccurrences(of: "株式会社", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if stripped.hasSuffix("・ホールディングス") || stripped.hasSuffix("･ホールディングス") {
@@ -138,6 +139,14 @@ enum Format {
             return fallback.isEmpty ? name : fallback
         }
         return stripped
+    }
+
+    /// 全角の英数字・記号（U+FF01〜FF5E）だけを半角にする。全角カナは変えない。
+    static func halfwidthASCII(_ text: String) -> String {
+        String(String.UnicodeScalarView(text.unicodeScalars.map { scalar in
+            (0xFF01...0xFF5E).contains(scalar.value)
+                ? Unicode.Scalar(scalar.value - 0xFEE0) ?? scalar : scalar
+        }))
     }
 
     /// Feed の提出日時（JST の `YYYY-MM-DD HH:mm`。RSS の `pubDate` から作る）を公開日として出す。
