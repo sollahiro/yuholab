@@ -124,7 +124,7 @@ enum Format {
     /// 途中の「ホールディングス・アンド…」は触らない。
     static func displayName(_ name: String, fallback: String = "") -> String {
         var stripped = halfwidthASCII(name)
-            .replacingOccurrences(of: "\\bHoldings\\b", with: "HD", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: "(?<![A-Za-z])Holdings(?![A-Za-z])", with: "HD", options: [.regularExpression, .caseInsensitive])
             .replacingOccurrences(of: "株式会社", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if stripped.hasSuffix("・ホールディングス") || stripped.hasSuffix("･ホールディングス") {
