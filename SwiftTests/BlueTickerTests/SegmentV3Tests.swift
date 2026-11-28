@@ -938,13 +938,15 @@ import Testing
         ]
         let year = try object(old: old, new: new)
         let reorgs = try #require(year[segmentWaterfallReorgsKey] as? [[String: Any]])
-        #expect(reorgs.count == 1)
-        let from = try #require(reorgs[0]["from"] as? [[String: Any]])
-        let to = try #require(reorgs[0]["to"] as? [[String: Any]])
-        #expect(Set(from.compactMap { $0["label"] as? String }) == ["GEM", "CI"])
-        #expect(Set(to.compactMap { $0["label"] as? String }) == ["EN", "MOB", "CI"])
+        // GEM→エナジー・モビリティ（split）と、組み替えられた同キーの CI の 2 組（前期の値どうしが 5% 以内で合う）。
+        #expect(reorgs.count == 2)
+        func labels(_ group: [String: Any], _ side: String) -> Set<String> {
+            Set((group[side] as? [[String: Any]] ?? []).compactMap { $0["label"] as? String })
+        }
+        #expect(reorgs.contains { labels($0, "from") == ["GEM"] && labels($0, "to") == ["EN", "MOB"] })
+        #expect(reorgs.contains { labels($0, "from") == ["CI"] && labels($0, "to") == ["CI"] })
         // 前期の開示と同じ値の DS は、再編に入れない。
-        #expect(!from.contains { $0["label"] as? String == "DS" })
+        #expect(!reorgs.contains { labels($0, "from").contains("DS") })
     }
 
     /// 前期列が合わない同キーの区分でも、足して合計が合わないなら再編に入れない（無関係な組替の巻き込み防止）。
@@ -986,6 +988,20 @@ import Testing
         let other = try #require(segments.first { $0["label"] as? String == "Other" })
         let prior = try #require(other[segmentWaterfallPriorKey] as? [String: Any])
         #expect((prior[segmentWaterfallPriorFromKey] as? [String]) == ["E1:ext:Others"])
+    }
+
+    /// U-NEXT HD 9418（25/08 の再編）: 旧 5 区分の値と、新 4 区分の前期値（24/08）は丸め幅では合わないが、
+    /// 同じ年の値どうしは近い。通信＋エネルギー→通信・エネルギー、店舗サービス＋業務用→店舗・施設、コンテンツ配信。
+    @Test func regroupSplitsByRestatedPriorValuesWithinTenPercent() {
+        let parts = SegmentWaterfall.splitRegroup(
+            gone: [("tsushin", 597.27), ("energy", 600.85), ("store", 692.53), ("gyomu", 287.69), ("content", 1088.81)],
+            added: [("tsushin_energy", 1133), ("content", 1097), ("store_facility", 959), ("finance", 78)],
+            tolerance: SegmentWaterfall.regroupRestatedTolerance, preferFiner: true)
+        let sets = (parts ?? []).map { ($0.from, $0.to) }
+        #expect(sets.count == 3)
+        #expect(sets.contains { $0.0 == ["tsushin", "energy"] && $0.1.contains("tsushin_energy") })
+        #expect(sets.contains { $0.0 == ["content"] && $0.1 == ["content"] })
+        #expect(sets.contains { $0.0 == ["store", "gyomu"] && $0.1.contains("store_facility") })
     }
 
     @Test func regroupUsesRestatedPriorValuesWhenNearbyTotalsAreAmbiguous() {

@@ -36,6 +36,8 @@ struct SegmentWaterfallResponse: Codable {
         var kind: String?
         var from: [Ref]?
         var to: [Ref]?
+        /// 旧と新の合計が近い部分集合に分けた組（regroup を分けた残り）。古いサーバーには無い。
+        var balanced: Bool?
     }
 
     struct Ref: Codable {

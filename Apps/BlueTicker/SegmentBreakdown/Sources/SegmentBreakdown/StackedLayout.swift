@@ -24,6 +24,8 @@ struct BreakdownItemInput: Equatable {
 struct BreakdownReorgGroup: Equatable {
     var fromKeys: [String]
     var toKeys: [String]
+    /// 旧と新の合計が近い部分集合に分けた組（API の `balanced`）。regroup でも、旧の行き先の大部分が分かる。
+    var balanced = false
     /// 旧も新も複数（regroup）。移り先の対応が分からない。
     var isRegroup: Bool { fromKeys.count > 1 && toKeys.count > 1 }
 }
@@ -46,6 +48,8 @@ enum BreakdownMark: Equatable {
     case ended
     /// 報告セグメントが無い年（連結合計 1 本）。
     case single
+    /// 地域別が取れていない年（その年の売上高 1 本。灰色）。
+    case missing
 }
 
 struct BreakdownBar: Equatable, Identifiable {
@@ -87,12 +91,19 @@ struct BreakdownLayout: Equatable {
 
 /// 報告セグメントが無い年（単一セグメント）の棒のキー。系列の色は付けない。
 let singleSegmentKey = "single|total"
+/// 地域別が取れていない年（売上高 1 本）の棒のキー。系列の色は付けない。
+let missingRegionKey = "missing|total"
+
+/// 系列の色を持たない棒（単一セグメント・地域別が取れていない年）。
+func isNeutralBarKey(_ key: String) -> Bool { key == singleSegmentKey || key == missingRegionKey }
 
 enum StackedLayout {
     static let barWidthRatio = 0.6
     static let headroom = 0.12
     /// 系列の色の数（`BreakdownPalette` の色数と同じ）。1 列に最大 9 区分の会社がある。
     static let paletteSize = 12
+    /// 旧も新も複数の組で、旧区分の色をそろえる先（新区分の最大）が組の新区分の合計に占める割合の下限。
+    static let regroupDominantShare = 0.75
 
     static func make(columns: [BreakdownColumnInput]) -> BreakdownLayout {
         let n = columns.count
@@ -168,7 +179,7 @@ enum StackedLayout {
         var position: [String: Int] = [:]
         var palette = 0
         for seen in ordered {
-            if seen.id == singleSegmentKey {
+            if isNeutralBarKey(seen.id) {
                 position[seen.id] = -1
             } else {
                 position[seen.id] = palette
@@ -184,7 +195,7 @@ enum StackedLayout {
             return root
         }
         for k in stride(from: n - 1, through: 1, by: -1) {
-            for group in columns[k].groups where !group.isRegroup {
+            for group in columns[k].groups {
                 func ids(_ keys: [String], _ column: Int) -> [String] {
                     keys.compactMap { key in
                         items[column].first { $0.key == key }.flatMap { seriesIDs[column][$0.key] }
@@ -196,6 +207,19 @@ enum StackedLayout {
                 let from = ids(group.fromKeys, k - 1).sorted { value($0, k - 1) > value($1, k - 1) }
                 let to = ids(group.toKeys, k).sorted { value($0, k) > value($1, k) }
                 guard !to.isEmpty else { continue }
+                // 旧も新も複数（regroup）は対応が決まらない。新区分の 1 つが組の大部分（75% 以上）を占めるときだけ、
+                // 旧区分の全部をその色にそろえる（通信＋エネルギー→通信・エネルギー＋小さな金融）。
+                if group.isRegroup {
+                    guard group.balanced else { continue }
+                    let total = to.reduce(0.0) { $0 + value($1, k) }
+                    guard total > 0, value(to[0], k) / total >= regroupDominantShare else { continue }
+                    for id in from where position[id] != -1 {
+                        let target = colorRoot(to[0])
+                        let source = colorRoot(id)
+                        if source != target { colorParent[source] = target }
+                    }
+                    continue
+                }
                 for (index, id) in from.enumerated() where position[id] != -1 {
                     let target = colorRoot(to[min(index, to.count - 1)])
                     let source = colorRoot(id)
@@ -211,7 +235,7 @@ enum StackedLayout {
         }
         var rootColor: [String: Int] = [:]
         var colorUse = Array(repeating: 0, count: paletteSize)
-        for seen in ordered where seen.id != singleSegmentKey {
+        for seen in ordered where !isNeutralBarKey(seen.id) {
             let root = colorRoot(seen.id)
             guard rootColor[root] == nil else { continue }
             let taken = Set((coexisting[root] ?? []).compactMap { rootColor[$0] })
@@ -223,7 +247,7 @@ enum StackedLayout {
         }
         var colorIndex: [String: Int] = [:]
         for seen in ordered {
-            colorIndex[seen.id] = seen.id == singleSegmentKey ? -1 : (rootColor[colorRoot(seen.id)] ?? 0)
+            colorIndex[seen.id] = isNeutralBarKey(seen.id) ? -1 : (rootColor[colorRoot(seen.id)] ?? 0)
         }
         let series = ordered.map {
             BreakdownSeries(id: $0.id, label: $0.label, colorIndex: colorIndex[$0.id] ?? 0)
@@ -312,7 +336,8 @@ enum StackedLayout {
                 column.append(
                     BreakdownBar(
                         column: k, key: item.key, label: item.label, value: item.value,
-                        mark: item.key == singleSegmentKey ? .single : (marks[k][item.key] ?? .none),
+                        mark: item.key == singleSegmentKey
+                            ? .single : (item.key == missingRegionKey ? .missing : (marks[k][item.key] ?? .none)),
                         colorIndex: colorIndex[seriesIDs[k][item.key] ?? item.key] ?? 0,
                         x: centers[k] - barWidth / 2, y: 1 - cumulative,
                         width: barWidth, height: height))

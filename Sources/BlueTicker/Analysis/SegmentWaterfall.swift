@@ -294,7 +294,7 @@ public enum SegmentWaterfall {
         }
         func group(
             from: [(key: String, row: BreakdownRowPayload)],
-            to: [(key: String, row: BreakdownRowPayload)]
+            to: [(key: String, row: BreakdownRowPayload)], balanced: Bool = false
         ) -> ReorgGroup {
             let kind: String
             switch (from.count, to.count) {
@@ -303,13 +303,15 @@ public enum SegmentWaterfall {
             case (1, _): kind = segmentWaterfallReorgKindSplit
             default: kind = segmentWaterfallReorgKindRegroup
             }
-            let json: [String: Any] = [
+            var json: [String: Any] = [
                 "kind": kind,
                 "from": side(from),
                 "to": side(to),
                 "from_total": breakdownJSONAmount(total(from)),
                 "to_total": breakdownJSONAmount(total(to)),
             ]
+            // 旧と新の合計が近い部分集合に分けた組（regroup を分けた残り）。旧の一部が別の組へ移る分は含まない。
+            if balanced { json["balanced"] = true }
             return ReorgGroup(
                 kind: kind, fromKeys: from.map(\.key), toKeys: to.map(\.key), json: json)
         }
@@ -321,12 +323,18 @@ public enum SegmentWaterfall {
         let restatedNew = added.compactMap { $0.row.priorYearExternalSales?.value }
         let filedOld = gone.compactMap { $0.row.externalSales?.value }
         let exact = restatedNew.count == added.count && filedOld.count == gone.count
+        // 前期列が付いていても、旧の値と丸め幅で合うとは限らない（旧区分から一部が別の新区分へ移る再編）。
+        // 合わなければ、同じ年の値どうし（旧の値と新の前期値）の近さで分ける（今期の値より近い）。
         let parts =
             exact
-            ? splitRegroup(
+            ? (splitRegroup(
                 gone: zip(gone, filedOld).map { ($0.0.key, $0.1) },
                 added: zip(added, restatedNew).map { ($0.0.key, $0.1) },
                 tolerance: regroupExactTolerance)
+                ?? splitRegroup(
+                    gone: zip(gone, filedOld).map { ($0.0.key, $0.1) },
+                    added: zip(added, restatedNew).map { ($0.0.key, $0.1) },
+                    tolerance: regroupRestatedTolerance, preferFiner: true))
             : splitRegroup(
                 gone: gone.map { ($0.key, total([$0])) },
                 added: added.map { ($0.key, total([$0])) },
@@ -335,7 +343,7 @@ public enum SegmentWaterfall {
         return parts.map { part in
             group(
                 from: gone.filter { part.from.contains($0.key) },
-                to: added.filter { part.to.contains($0.key) })
+                to: added.filter { part.to.contains($0.key) }, balanced: true)
         }
     }
 
@@ -346,10 +354,13 @@ public enum SegmentWaterfall {
     static let regroupSplitTolerance = 0.10
     /// 前期列の値で分けるときの許容（丸め幅の累積に収まる 0.1%）。
     static let regroupExactTolerance = 0.001
+    /// 前期列の値と旧の値が丸め幅では合わないとき（旧区分の一部が別の新区分へ移る再編）の許容。
+    /// 同じ年の値どうしなので、今期の値で分ける 10% より厳しくする。
+    static let regroupRestatedTolerance = 0.05
 
     static func splitRegroup(
         gone: [(key: String, value: Double)], added: [(key: String, value: Double)],
-        tolerance: Double
+        tolerance: Double, preferFiner: Bool = false
     ) -> [(from: Set<String>, to: Set<String>)]? {
         guard gone.count >= 2, gone.count <= 6, added.count >= 2, added.count <= 6 else {
             return nil
@@ -388,10 +399,17 @@ public enum SegmentWaterfall {
                         worst = max(worst, abs(fromTotals[block] - toTotals[block]) / base)
                     }
                     guard worst <= tolerance else { return }
-                    if let current = best,
-                        current.score < worst
+                    if let current = best {
+                        // 通常は差が最小の分け方。`preferFiner` は、許容に収まる中で最も細かく分ける
+                        // （旧区分ごとの行き先を、できるだけ細かく決める）。
+                        if preferFiner {
+                            if current.blocks > blockCount
+                                || (current.blocks == blockCount && current.score <= worst)
+                            { return }
+                        } else if current.score < worst
                             || (current.score == worst && current.blocks >= blockCount)
-                    { return }
+                        { return }
+                    }
                     var parts: [(from: Set<String>, to: Set<String>)] = Array(
                         repeating: ([], []), count: blockCount)
                     for (index, block) in assignment.enumerated() {
