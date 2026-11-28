@@ -1072,6 +1072,11 @@ enum GeographyBreakdownLLMNormalizer {
         let parentIndices = rows.indices.filter { rows[$0].rowKind == "segment" }
         guard parentIndices.count >= 1 else { return rows }
         return rows.enumerated().map { idx, row in
+            if let slashChild = slashParentChildSubtotal(
+                row, among: rows, parentIndices: parentIndices, excluding: idx)
+            {
+                return slashChild
+            }
             let childForMatch: BreakdownRow
             if row.rowKind == "segment" {
                 childForMatch = row
@@ -1092,6 +1097,29 @@ enum GeographyBreakdownLLMNormalizer {
             copy.labelRaw = childLabel
             return copy
         }
+    }
+
+    /// 2段見出しで「その他 | その他/エジプト」と並ぶ列（親の合計列＋子の列）。ラベルが「親/子」で、
+    /// 親が同じ表の地域行にあり金額が親以下なら、子は親の内数（6363 S100TQTO）。
+    private static func slashParentChildSubtotal(
+        _ row: BreakdownRow, among rows: [BreakdownRow], parentIndices: [Int], excluding: Int
+    ) -> BreakdownRow? {
+        guard row.rowKind == "segment", row.amount > 0 else { return nil }
+        let compact = compactGeographyLabel(row.labelRaw)
+        guard let slash = compact.firstIndex(where: { $0 == "/" || $0 == "／" }) else { return nil }
+        let parentPart = String(compact[..<slash])
+        let childPart = String(compact[compact.index(after: slash)...])
+        guard !parentPart.isEmpty, !childPart.isEmpty else { return nil }
+        guard let parentIdx = parentIndices.first(where: {
+            $0 != excluding && compactGeographyLabel(rows[$0].labelRaw) == parentPart
+                && rows[$0].amount >= row.amount
+        }) else { return nil }
+        var copy = row
+        copy.rowKind = "subtotal"
+        copy.categoryGroup = rows[parentIdx].labelRaw
+        copy.category = childPart
+        copy.labelRaw = childPart
+        return copy
     }
 
     private static func bestOfWhichParentIndex(
