@@ -3740,7 +3740,11 @@ extension BreakdownExtractor {
                 parser.delegate = collector
                 parser.parse()
                 for block in collector.blocks {
-                    let text = DescriptionOfBusinessExtractor.htmlToText(block.content)
+                    // 区分ごとの金額表は別の材料（区分名と売上の一覧）で渡す。説明の文だけにする。
+                    let withoutTables = block.content.replacingOccurrences(
+                        of: "(?is)<table\\b.*?</table>", with: " ",
+                        options: [.regularExpression])
+                    let text = DescriptionOfBusinessExtractor.htmlToText(withoutTables)
                     guard let start = text.range(of: "報告セグメント") else { continue }
                     return String(text[start.lowerBound...].prefix(limit))
                 }

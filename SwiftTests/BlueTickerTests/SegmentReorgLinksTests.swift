@@ -59,18 +59,21 @@ import Testing
     }
 }
 
+/// 旧区分の名称 → 段階ごとの答え（新区分の名称、または cannot_decide）。
 private actor ReorgAnswers: SegmentReorgDeciding {
-    private let movedPairs: Set<[String]>
-    private(set) var asked: Set<[String]> = []
+    private let answers: [String: [String: String]]
+    private(set) var asked: [[String]] = []
 
-    init(movedPairs: Set<[String]>) { self.movedPairs = movedPairs }
+    init(answers: [String: [String: String]]) { self.answers = answers }
 
-    func chooseReorg(_ pair: SegmentReorgPair) async -> JevChoiceAggregate.Sample {
-        asked.insert([pair.oldLabel, pair.newLabel])
-        let selected = movedPairs.contains([pair.oldLabel, pair.newLabel])
-            ? SegmentReorgJev.moved : SegmentReorgJev.notMoved
+    func chooseDestination(
+        _ pair: SegmentReorgPair, options: [String], model: String
+    ) async -> JevChoiceAggregate.Sample {
+        asked.append([pair.oldLabel, model])
+        let label = answers[pair.oldLabel]?[model] ?? SegmentReorgJev.cannotDecide
+        let selected = pair.currentNew.first { $0.label == label }?.key ?? SegmentReorgJev.cannotDecide
         return JevChoiceAggregate.Sample(
-            selected: selected, probability: 0.99, options: SegmentReorgJev.options, model: "test")
+            selected: selected, probability: 0.99, options: options, model: model)
     }
 }
 
@@ -102,25 +105,35 @@ private actor ReorgAnswers: SegmentReorgDeciding {
         ])
     }
 
-    @Test func asksEveryUnlinkedPairAndKeepsManyToManyAnswers() async throws {
+    @Test func asksOncePerOldSegmentWithAmountsAndStepsThroughTheModels() async throws {
         let question = try #require(
             SegmentWaterfall.reorgQuestion(
                 fyEnd: "2025-08-31", previous: ("2024-08-31", "A", old), payload: new, transitions: []))
         #expect(question.old.map(\.key) == ["TEL", "BIZ", "SHOP0"])
-        #expect(question.linked == [["TEL", "TE"]])
-        let decider = ReorgAnswers(movedPairs: [
-            ["業務用システム事業", "店舗・施設ソリューション事業"], ["店舗サービス事業", "店舗・施設ソリューション事業"],
-            ["店舗サービス事業", "金融事業"],
+        #expect(question.new.map(\.key) == ["TE", "SHOP", "FIN"])
+        #expect(question.old.first { $0.key == "BIZ" }?.sales == 50)
+        #expect(question.new.first { $0.key == "SHOP" }?.sales == 15)
+        let first = Api.openrouterReorgModels[0]
+        let second = Api.openrouterReorgModels[1]
+        let decider = ReorgAnswers(answers: [
+            // 名称は通信・エネルギーに似ているが、モデルは金融と答える（名称より優先される）。
+            "通信事業": [first: "金融事業"],
+            // 1 段目で決められず、2 段目で決まる。
+            "業務用システム事業": [second: "店舗・施設ソリューション事業"],
+            // どちらの段でも決められない。
+            "店舗サービス事業": [:],
         ])
         let verdicts = await SegmentReorgJev.judge(
-            question, previousFilingText: "前", currentFilingText: "当",
-            skipping: [["BIZ", "TE"]], decider: decider)
-        // 3 × 3 組から、名称で決まった 1 組と判定済みの 1 組を除く。
-        #expect(verdicts.count == 7)
-        #expect(
-            verdicts.filter { $0.decision == segmentTransitionDecisionSuccessor }
-                .map { [$0.oldKey, $0.newKey] }
-                == [["BIZ", "SHOP"], ["SHOP0", "SHOP"], ["SHOP0", "FIN"]])
+            question, previousFilingText: "前", currentFilingText: "当", decider: decider)
+        #expect(verdicts == [
+            SegmentReorgVerdict(oldKey: "TEL", newKey: "FIN", decision: segmentTransitionDecisionSuccessor),
+            SegmentReorgVerdict(oldKey: "BIZ", newKey: "SHOP", decision: segmentTransitionDecisionSuccessor),
+            SegmentReorgVerdict(oldKey: "SHOP0", newKey: nil, decision: segmentTransitionDecisionSuccessorReview),
+        ])
+        let asked = await decider.asked
+        // 決まった段で止まる（TEL は 1 段、BIZ は 2 段、SHOP0 は 2 段）。
+        #expect(asked.filter { $0[0] == "通信事業" }.count == 3)
+        #expect(asked.filter { $0[0] == "業務用システム事業" }.map { $0[1] }.contains(second))
     }
 
     @Test func storedSuccessorsBecomeJevLinksWithoutChangingPriorOrLineCut() throws {
@@ -142,11 +155,12 @@ private actor ReorgAnswers: SegmentReorgDeciding {
         let plain = try year([])
         let judged = try year([
             draft(segmentTransitionDecisionSuccessor, "BIZ", "SHOP"),
-            draft(segmentTransitionDecisionSuccessorNone, "BIZ", "FIN"),
+            draft(segmentTransitionDecisionSuccessor, "TEL", "FIN"),
+            draft(segmentTransitionDecisionSuccessorReview, "SHOP0", "TE"),
         ])
         let links = try #require(judged[segmentWaterfallReorgLinksKey] as? [[String: String]])
         #expect(links == [
-            ["from": "TEL", "to": "TE", "basis": "name"], ["from": "BIZ", "to": "SHOP", "basis": "jev"],
+            ["from": "BIZ", "to": "SHOP", "basis": "jev"], ["from": "TEL", "to": "FIN", "basis": "jev"],
         ])
         func stripped(_ object: [String: Any]) throws -> Data {
             var copy = object

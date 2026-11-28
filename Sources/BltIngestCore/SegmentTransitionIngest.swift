@@ -24,7 +24,7 @@ func runSegmentTransitionIngest(
         guard let judge else { continue }
         // 書類の取得と Jev の呼び出しは長いので、DB の再試行・タイムアウトの外で行う。
         for item in pending {
-            let verdicts = await judge(item.question, item.previousDocID, item.docID, item.judged)
+            let verdicts = await judge(item.question, item.previousDocID, item.docID)
             guard !verdicts.isEmpty else { continue }
             try await withDbRetry(
                 logger: logger, context: "company_segment_transitions successor code=\(code)"
@@ -35,26 +35,25 @@ func runSegmentTransitionIngest(
     }
 }
 
-/// 移り先の判定（問い・前年の docID・当年の docID・判定済みの組 → 結果）。
+/// 移り先の判定（問い・前年の docID・当年の docID → 旧区分ごとの結果）。判定済みの旧区分は問いに含めない。
 typealias SegmentReorgJudge = @Sendable (
-    SegmentReorgQuestion, String, String, Set<[String]>
+    SegmentReorgQuestion, String, String
 ) async -> [SegmentReorgVerdict]
 
 private struct PendingReorg: Sendable {
     var question: SegmentReorgQuestion
     var previousDocID: String
     var docID: String
-    var judged: Set<[String]>
 }
 
-/// 同じ組の行があれば置き換える（再試行しても結果は同じ）。
+/// 同じ旧区分の行があれば置き換える（再試行しても結果は同じ）。
 private func writeSuccessors(
     _ verdicts: [SegmentReorgVerdict], code: String, fyEnd: String, db: Database
 ) async throws {
     for verdict in verdicts {
         // 年のつなぎの行（同じ旧・新の組がありうる）と ID を分ける。
         let id = CompanySegmentTransition.compositeID(
-            code: code, fyEnd: fyEnd, oldKey: verdict.oldKey, newKey: verdict.newKey)
+            code: code, fyEnd: fyEnd, oldKey: verdict.oldKey, newKey: nil)
             + "#successor"
         try await CompanySegmentTransition.find(id, on: db)?.delete(on: db)
         let model = CompanySegmentTransition(
@@ -95,19 +94,12 @@ private func writeSegmentTransitions(
         {
             let judged = Set(
                 stored.filter { segmentTransitionSuccessorDecisions.contains($0.decision) }
-                    .compactMap { row -> [String]? in
-                        guard let old = row.oldKey, let new = row.newKey else { return nil }
-                        return [old, new]
-                    })
-            let skip = judged.union(question.linked)
-            question.old = question.old.filter { old in
-                question.new.contains { !skip.contains([old.key, $0.key]) }
-            }
+                    .compactMap(\.oldKey))
+            question.old = question.old.filter { !judged.contains($0.key) }
             if !question.old.isEmpty {
                 pending.append(
                     PendingReorg(
-                        question: question, previousDocID: previous.docID, docID: current.docID,
-                        judged: judged))
+                        question: question, previousDocID: previous.docID, docID: current.docID))
             }
         }
         if sameTransitions(existing, drafts) { continue }

@@ -128,16 +128,17 @@ private func seedYear(
                 rows: [segmentRow("GammaMember", value: 9_000_000), segmentRow("DeltaMember", value: 8_000_000)],
                 db: db)
             let calls = JudgeCalls()
-            let judge: SegmentReorgJudge = { question, previousDocID, docID, judged in
+            let judge: SegmentReorgJudge = { question, previousDocID, docID in
                 await calls.record([previousDocID, docID])
-                return question.old.flatMap { old in
-                    question.new.filter { !judged.contains([old.key, $0.key]) && !question.linked.contains([old.key, $0.key]) }.map { new in
-                        SegmentReorgVerdict(
-                            oldKey: old.key, newKey: new.key,
-                            decision: old.key.hasSuffix("AlphaMember") && new.key.hasSuffix("GammaMember")
-                                ? segmentTransitionDecisionSuccessor
-                                : segmentTransitionDecisionSuccessorNone)
-                    }
+                return question.old.map { old in
+                    old.key.hasSuffix("AlphaMember")
+                        ? SegmentReorgVerdict(
+                            oldKey: old.key,
+                            newKey: question.new.first { $0.key.hasSuffix("GammaMember") }?.key,
+                            decision: segmentTransitionDecisionSuccessor)
+                        : SegmentReorgVerdict(
+                            oldKey: old.key, newKey: nil,
+                            decision: segmentTransitionDecisionSuccessorReview)
                 }
             }
             try await runSegmentTransitionIngest(db: db, listedCodes: ["1234"], judge: judge)
@@ -147,7 +148,7 @@ private func seedYear(
 
             #expect(await calls.values == [["S2025", "S2026"]])
             #expect(Set(first.compactMap(\.id)) == Set(second.compactMap(\.id)))
-            #expect(second.filter { segmentTransitionSuccessorDecisions.contains($0.decision) }.count == 4)
+            #expect(second.filter { segmentTransitionSuccessorDecisions.contains($0.decision) }.count == 2)
 
             guard
                 case .found(let object) = try await loadStoredSegmentWaterfall(

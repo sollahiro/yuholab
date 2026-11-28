@@ -377,19 +377,22 @@ public enum SegmentWaterfall {
         }
         let named = SegmentReorgLinks.deterministic(
             from: labeled(fromKeys, previous.rows), to: labeled(toKeys, payload.rows))
-        // コードで決まった組に、Jev が移ったと判定した組を足す（区分を超えた移動は名称で決まった旧区分にもある）。
-        let pairs = Set(named.map { [$0.fromKey, $0.toKey] })
-        let judged = successors.compactMap { draft -> SegmentReorgLink? in
-            guard let from = draft.oldKey, let to = draft.newKey, !pairs.contains([from, to]),
+        // モデルが主な移り先を選んだ旧区分は、名称で決まった対応より優先する（名称は似ているだけのことがある）。
+        let verdicts = successors.filter { $0.decision == segmentTransitionDecisionSuccessor }
+        let decided = Set(verdicts.compactMap(\.oldKey))
+        let judged = verdicts.compactMap { draft -> SegmentReorgLink? in
+            guard let from = draft.oldKey, let to = draft.newKey,
                 fromKeys.contains(from), toKeys.contains(to)
             else { return nil }
             return SegmentReorgLink(fromKey: from, toKey: to, basis: segmentTransitionBasisJev)
         }
-        return named + judged.sorted { ($0.fromKey, $0.toKey) < ($1.fromKey, $1.toKey) }
+        let kept = named.filter { !decided.contains($0.fromKey) }
+        return kept + judged.sorted { ($0.fromKey, $0.toKey) < ($1.fromKey, $1.toKey) }
     }
 
-    /// Jev に聞く再編年の問い。金額や件数で対応が決まった組（split / merge / replace）の年は聞かない。
-    /// 旧区分は全部聞く。コードで決まった組は `linked` に入れて聞き直さない。
+    /// Jev に聞く再編年の問い。旧区分 1 つにつき「主な移り先」を聞く。
+    /// 聞くのは、複数の新区分に分かれる regroup の旧区分のうち、新しい年に同じキーの区分がないもの。
+    /// 旧 1・新 1 や、金額で新区分 1 つに決まった組は聞かない。
     public static func reorgQuestion(
         fyEnd: String,
         previous: (fyEnd: String, docID: String, payload: BreakdownSnapshotPayload),
@@ -398,22 +401,22 @@ public enum SegmentWaterfall {
         let groups = reorgGroups(
             fyEnd: fyEnd, previous: previous, payload: payload,
             metric: segmentWaterfallMetricExternalSales, transitions: transitions)
-        guard groups.contains(where: { $0.kind == segmentWaterfallReorgKindRegroup }) else { return nil }
-        let fromKeys = groups.flatMap(\.fromKeys)
-        let toKeys = groups.flatMap(\.toKeys)
-        func segments(_ keys: [String], _ rows: [BreakdownRowPayload]) -> [SegmentReorgQuestion.Segment] {
-            keys.compactMap { key in
-                rows.first { $0.rowKind == "segment" && $0.segmentKey == key }
-                    .map { SegmentReorgQuestion.Segment(key: key, label: $0.label) }
+        let regroups = groups.filter { $0.kind == segmentWaterfallReorgKindRegroup }
+        guard !regroups.isEmpty else { return nil }
+        func segment(_ key: String, _ rows: [BreakdownRowPayload]) -> SegmentReorgQuestion.Segment? {
+            rows.first { $0.rowKind == "segment" && $0.segmentKey == key }.map {
+                SegmentReorgQuestion.Segment(
+                    key: key, label: $0.label, sales: $0.externalSales?.value,
+                    priorSales: $0.priorYearExternalSales?.value)
             }
         }
-        let linked = Set(
-            reorgLinks(groups: groups, previous: previous.payload, payload: payload)
-                .map { [$0.fromKey, $0.toKey] })
-        let old = segments(fromKeys, previous.payload.rows)
-        let new = segments(toKeys, payload.rows)
-        guard !old.isEmpty, !new.isEmpty else { return nil }
-        return SegmentReorgQuestion(fyEnd: fyEnd, old: old, new: new, linked: linked)
+        let newKeys = Set(payload.rows.filter { $0.rowKind == "segment" }.compactMap(\.segmentKey))
+        let askedKeys = regroups.flatMap(\.fromKeys).filter { !newKeys.contains($0) }
+        let old = askedKeys.compactMap { segment($0, previous.payload.rows) }
+        let new = regroups.flatMap(\.toKeys).compactMap { segment($0, payload.rows) }
+        guard !old.isEmpty, new.count >= 2 else { return nil }
+        let allOld = groups.flatMap(\.fromKeys).compactMap { segment($0, previous.payload.rows) }
+        return SegmentReorgQuestion(fyEnd: fyEnd, old: old, new: new, allOld: allOld)
     }
 
     /// regroup を、旧の合計と新の合計が近い部分集合の組に分ける。

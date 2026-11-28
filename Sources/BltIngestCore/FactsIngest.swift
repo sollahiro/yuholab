@@ -315,9 +315,9 @@ public func runFactsIngestCommand(
                     ? publicBreakdownListed : Set(publicBreakdownSets.keep.map(\.code))
                 var judge: SegmentReorgJudge?
                 if context.judgesSegmentReorg {
-                    judge = { question, previousDocID, docID, judged in
+                    judge = { question, previousDocID, docID in
                         await context.judgeSegmentReorg(
-                            question, previousDocID: previousDocID, docID: docID, skipping: judged)
+                            question, previousDocID: previousDocID, docID: docID)
                     }
                 }
                 try await runSegmentTransitionIngest(

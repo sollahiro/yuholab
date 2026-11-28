@@ -1006,10 +1006,9 @@ public extension BltServerContext {
     /// 再編の移り先を Jev で判定できるか（Decisions キーがあるか）。
     var judgesSegmentReorg: Bool { segmentReorgDecider != nil }
 
-    /// 前年と当年の有報のセグメント注記を根拠に、旧区分 × 新区分を判定する。書類か注記が取れなければ空。
+    /// 前年と当年の有報のセグメント注記を根拠に、旧区分ごとの主な移り先を判定する。書類か注記が取れなければ空。
     func judgeSegmentReorg(
-        _ question: SegmentReorgQuestion, previousDocID: String, docID: String,
-        skipping judged: Set<[String]>
+        _ question: SegmentReorgQuestion, previousDocID: String, docID: String
     ) async -> [SegmentReorgVerdict] {
         guard let decider = segmentReorgDecider,
             let previousDir = await downloadAnnualFilingXbrl(docID: previousDocID),
@@ -1019,7 +1018,7 @@ public extension BltServerContext {
         else { return [] }
         return await SegmentReorgJev.judge(
             question, previousFilingText: previousText, currentFilingText: currentText,
-            skipping: judged, decider: decider)
+            decider: decider)
     }
 
     /// 内訳の1軸を、その書類の会社拡張 member の役割（Jev 判定、書類ごとに1回）を載せて解決する。
