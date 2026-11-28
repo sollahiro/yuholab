@@ -89,17 +89,26 @@ actor APIClient {
     }
 
     /// 報告セグメントの外部売上の年次推移（新しい年が先頭）。単一セグメントや未算出は 404。
-    func segmentWaterfall(code: String, years: Int = 3) async throws -> SegmentWaterfallResponse {
-        let url = try queryURL(
+    func segmentWaterfall(code: String, years: Int = APIClient.breakdownYears) async throws -> SegmentWaterfallResponse {
+        try await get(try segmentWaterfallURL(code: code, years: years), cacheTTL: ttl(for: code))
+    }
+
+    /// 内訳カード（セグメント・地域）の年数。先読みとカードの取得で URL（＝キャッシュのキー）をそろえる。
+    static let breakdownYears = 5
+
+    private func segmentWaterfallURL(code: String, years: Int) throws -> URL {
+        try queryURL(
             "v1/companies/\(code)/waterfall/segment",
             [("metric", "external_sales"), ("years", String(years))])
-        return try await get(url, cacheTTL: ttl(for: code))
+    }
+
+    private func geographyWaterfallURL(code: String, years: Int) throws -> URL {
+        try queryURL("v1/companies/\(code)/waterfall/geography", [("years", String(years))])
     }
 
     /// 地域別売上の年次推移（新しい年が先頭）。地域名は正規化され、比べられる年の塊に分かれる。未算出は 404。
-    func geographyWaterfall(code: String, years: Int = 3) async throws -> GeographyWaterfallResponse {
-        let url = try queryURL("v1/companies/\(code)/waterfall/geography", [("years", String(years))])
-        return try await get(url, cacheTTL: ttl(for: code))
+    func geographyWaterfall(code: String, years: Int = APIClient.breakdownYears) async throws -> GeographyWaterfallResponse {
+        try await get(try geographyWaterfallURL(code: code, years: years), cacheTTL: ttl(for: code))
     }
 
     /// 地域別の年次推移と、直近の有報の地域別が省略・未取得かの理由を 1 本の取得で返す。
@@ -108,9 +117,9 @@ actor APIClient {
     /// `missingReason` は `geographyMissingReason` と同じ意味（実データありは nil。省略は
     /// `domestic_dominant_90pct` / `no_overseas_sales`、それ以外の 404 は `unavailable`、通信エラーなどは nil）。
     func geographyWaterfallResult(
-        code: String, years: Int = 3
+        code: String, years: Int = APIClient.breakdownYears
     ) async -> (response: GeographyWaterfallResponse?, missingReason: String?) {
-        guard let url = try? queryURL("v1/companies/\(code)/waterfall/geography", [("years", String(years))])
+        guard let url = try? geographyWaterfallURL(code: code, years: years)
         else { return (nil, nil) }
         do {
             let response: GeographyWaterfallResponse = try await get(url, cacheTTL: ttl(for: code))
@@ -200,6 +209,26 @@ actor APIClient {
             if await prefetchFailedRateLimit({
                 let _: CompanyOverviewResponse = try await get(
                     path("v1/companies/\(code)/overview"),
+                    cacheTTL: ttl(for: code),
+                    hapisClass: .prefetch)
+            }) { return }
+            // 内訳カード（セグメント・地域）。開いたときに取得待ちで遅れて出ないよう、ここで温めておく。
+            // 404（単一セグメント・省略など）は取り直しを避けるためキャッシュされないが、先読みは続ける。
+            if await prefetchFailedRateLimit({
+                let _: SegmentWaterfallResponse = try await get(
+                    try segmentWaterfallURL(code: code, years: Self.breakdownYears),
+                    cacheTTL: ttl(for: code),
+                    hapisClass: .prefetch)
+            }) { return }
+            if await prefetchFailedRateLimit({
+                let _: GeographyWaterfallResponse = try await get(
+                    try geographyWaterfallURL(code: code, years: Self.breakdownYears),
+                    cacheTTL: ttl(for: code),
+                    hapisClass: .prefetch)
+            }) { return }
+            if await prefetchFailedRateLimit({
+                let _: BreakdownResponse = try await get(
+                    try queryURL("v1/companies/\(code)/breakdown", [("axis", "segment")]),
                     cacheTTL: ttl(for: code),
                     hapisClass: .prefetch)
             }) { return }
