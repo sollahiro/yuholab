@@ -91,6 +91,45 @@ import Testing
         #expect(rows(dentsu) == 4)
     }
 
+    /// 列が地域の売上表(型A)。source: code=2776 doc_id=S100VL2N page=0 field=geography 日本11,054,172 中国1,225,124 その他17,504 合計12,296,801(千円)
+    @Test func regionColumnSalesTableIsRecognized() {
+        let table = BreakdownTable(
+            heading: "２．地域ごとの情報",
+            markdown: "| | 日本 | 中国 | その他 | 合計 |\n|---|---|---|---|---|\n| 売上高 | 11,054,172 | 1,225,124 | 17,504 | 12,296,801 |", period: "当期")
+        #expect(BreakdownExtractor.tableHasRegionColumnHeaders(table))
+        // 列が事業の表、列数が少ない表は対象外
+        let business = BreakdownTable(
+            heading: "報告セグメント",
+            markdown: "| | 食品 | 機械 | 合計 |\n|---|---|---|---|\n| 売上高 | 1 | 2 | 3 |", period: "当期")
+        #expect(!BreakdownExtractor.tableHasRegionColumnHeaders(business))
+        let two = BreakdownTable(
+            heading: "地域",
+            markdown: "| | 日本 | 合計 |\n|---|---|---|\n| 売上高 | 1 | 2 |", period: "当期")
+        #expect(!BreakdownExtractor.tableHasRegionColumnHeaders(two))
+    }
+
+    /// source: code=2776 doc_id=S100VL2N page=0 field=segment_note_geography (行ラベル列なし)
+    @Test func regionColumnTableWithoutRowLabelColumnIsRecognized() {
+        let noLabel = BreakdownTable(
+            heading: "地域ごとの情報",
+            markdown: "| 日本 | 中国 | その他 | 合計 |\n|---|---|---|---|\n| 11,054,172 | 1,225,124 | 17,504 | 12,296,801 |", period: "当期")
+        #expect(BreakdownExtractor.tableHasRegionColumnHeaders(noLabel))
+        // source: code=5632 doc_id=S100YCQQ page=0 field=segment_note_geography (単位行が見出しの上)
+        let unitAbove = BreakdownTable(
+            heading: "地域ごとの情報",
+            markdown: "| (単位：百万円) | | | |\n|---|---|---|---|\n| 日本 | 北米 | アジア | 合計 |\n| 86,328 | 8,296 | 32,271 | 126,895 |", period: "当期")
+        #expect(BreakdownExtractor.tableHasRegionColumnHeaders(unitAbove))
+        // source: code=7599 doc_id=S100O5E0 page=0 field=major_customers (主要な顧客の表。値の列に日本が出る)
+        let customers = BreakdownTable(
+            heading: "主要な顧客ごとの情報",
+            markdown: "| 顧客の名称又は氏名 | 売上高 | 関連するセグメント名 |\n|---|---|---|\n| 株式会社ユー・エス・エス | 5,000 | 日本 |", period: "当期")
+        #expect(!BreakdownExtractor.tableHasRegionColumnHeaders(customers))
+        let impairment = BreakdownTable(
+            heading: "減損損失",
+            markdown: "| 減損損失 | 日本 | 米国 | その他 | 合計 |\n|---|---|---|---|---|\n| 減損損失 | 1 | 2 | 3 | 6 |", period: "当期")
+        #expect(!BreakdownExtractor.tableHasRegionColumnHeaders(impairment))
+    }
+
     @Test func regionTableWithAustraliaRowCountsAsGeographyTable() {
         let table = BreakdownTable(
             heading: "4.地域別に関する情報", markdown: "| 地域 | 外部顧客への売上高 |\n|---|---|\n| 国内(日本) | 17,089,485 |\n| 豪州 | 9,237,950 |\n| その他 | 48,191 |\n| 計 | 26,375,627 |", period: "当期")

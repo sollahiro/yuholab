@@ -325,6 +325,26 @@ import Testing
                 ? nil : components.map { StatementLineComponent(tag: $0, weight: 1) })
     }
 
+    // source: code=4324 fy_end=2020-12-31 doc_id=S100L0TZ page=0 field=NetSalesIFRS/Revenue2IFRS 売上高(注)は参考行、売上総利益は 収益 − 原価
+    @Test func grossProfitComponentRevenueReplacesReferenceNetSales() {
+        let dentsu = [
+            line("NetSalesIFRS", 4_498_216),
+            line("Revenue2IFRS", 939_243),
+            line("CostOfSalesIFRS", 100_000),
+            line("GrossProfitIFRS", 839_243, components: ["Revenue2IFRS", "CostOfSalesIFRS"]),
+        ]
+        #expect(StatementFinancialsResolver.grossProfitComponentRevenue(
+            dentsu, sales: 4_498_216) == 939_243)
+        // 売上高が売上総利益の構成要素（通常の PL）なら立てない
+        let normal = [
+            line("NetSales", 8_893_693),
+            line("CostOfSales", 7_300_235),
+            line("GrossProfit", 1_593_457, components: ["NetSales", "CostOfSales"]),
+        ]
+        #expect(StatementFinancialsResolver.grossProfitComponentRevenue(
+            normal, sales: 8_893_693) == nil)
+    }
+
     /// geography カバー判定の分母: PL トップライン。合計行があればそれ、無ければ収益行の和。
     @Test func incomeStatementTopLineRevenue() {
         // 3382: 営業収益（合計）＝売上高＋営業収入。Summary も営業収益なので立てない。

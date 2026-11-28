@@ -1393,8 +1393,63 @@ enum BreakdownExtractor {
                 // 前期の表しか拾えないときは採用しない（従来の same_as 経路に戻す）。
                 if !geographyTablesAreAllPriorPeriod(jgaapResult) { return jgaapResult }
             }
+            // 地域専用タグが無く、セグメント注記に「地域ごとの情報（1）売上高」の表（列=地域）だけがある型
+            // （2776 S100VL2N / 3556 S100UZQY。見出し「２．地域ごとの情報」の直後）。
+            let columnTables = jgaapSegmentNoteRegionColumnTables(xbrlDir: xbrlDir)
+            if !columnTables.isEmpty {
+                let columnResult = buildResult(
+                    xbrlDir: xbrlDir, tables: columnTables,
+                    dimensionKeywords: Xbrl.geographyDimensionKeywords)
+                if !geographyTablesAreAllPriorPeriod(columnResult) { return columnResult }
+            }
         }
         return result
+    }
+
+    /// 列が地域の売上表（見出し行に 日本/国内/本邦 の列があり、データ列が3つ以上）か。
+    /// 有形固定資産の同形の表は、見出しと直前キャプションの除外で落とす（`mixedSkipNearestAssetCaptionTables`）。
+    static func tableHasRegionColumnHeaders(_ table: BreakdownTable) -> Bool {
+        // 減損損失・のれん・償却の表は地域列でも売上ではない（5632 の近傍表）。
+        let nonSalesWords = ["減損", "のれん", "償却", "固定資産", "資産", "顧客", "相手先", "セグメント名", "氏名", "名称"]
+        let head = table.markdown.split(separator: "\n").prefix(8).joined()
+        if nonSalesWords.contains(where: head.contains) { return false }
+        for line in table.markdown.split(separator: "\n", omittingEmptySubsequences: false) {
+            let trimmed = String(line).trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("|"), !trimmed.contains("---") else { continue }
+            let cells = trimmed.split(separator: "|", omittingEmptySubsequences: true)
+                .map { String($0).filter { !$0.isWhitespace } }
+                .filter { !$0.isEmpty }
+            // 数値の行まで来たら見出しは終わり。
+            let numeric = cells.filter {
+                !$0.isEmpty && $0.allSatisfy { "0123456789,.△▲-−()".contains($0) }
+            }
+            if numeric.count >= 2 { return false }
+            guard cells.count >= 3 else { continue }
+            // 見出しのセル全体が地域名（国内(日本) など短い表記まで）。表の値の列に日本が出るだけの表は除く。
+            if cells.contains(where: { cell in
+                cell.count <= 8 && ["日本", "国内", "本邦"].contains(where: cell.contains)
+            }) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// J-GAAP セグメント注記の「地域ごとの情報」見出しの下にある、列が地域の売上表。
+    /// 報告セグメントが地域区分の会社はセグメントがそのまま地域別（same_as: segment）なので使わない。
+    static func jgaapSegmentNoteRegionColumnTables(xbrlDir: URL) -> [BreakdownTable] {
+        if reportableSegmentsAreGeographic(xbrlDir: xbrlDir) { return [] }
+        return extractFromTextBlocks(
+            xbrlDir: xbrlDir,
+            dedicatedTags: [],
+            mixedTags: Xbrl.jgaapSegmentNoteGeographyFallbackTextBlockTags,
+            dedicatedHeading: "地域ごとの情報",
+            mixedKeywords: ["地域ごとの情報"],
+            skipGeographyAssetMetricTables: true,
+            mixedHeadingLikeOnly: true,
+            dropOfWhichRegionColumns: true,
+            mixedSkipNearestAssetCaptionTables: true
+        ).filter(tableHasRegionColumnHeaders)
     }
 
     /// 地域の表が前期のものだけで、当期の表が無い（ダイキン S100OG1V: 前期の比較表だけが残る）。

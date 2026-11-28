@@ -28,6 +28,23 @@ struct GeographyBreakdownLLMNormalizerTests {
         #expect(filtered.contains { $0.rowKind == "subtotal" && $0.labelRaw == "合計" })
     }
 
+    // 6363 S100TQTO(FY2024/3, 原本 page=0, field=RevenuesFromExternalCustomersInformationForEachRegionTextBlock)
+    @Test("2段見出しの「その他/エジプト」列は親「その他」の内数にする")
+    func slashChildOfOtherColumnBecomesSubtotal() throws {
+        let rows: [BreakdownRow] = [
+            .init(labelRaw: "日本", amount: 31_065, share: nil, profit: nil, rowKind: "segment"),
+            .init(labelRaw: "アジア", amount: 13_411, share: nil, profit: nil, rowKind: "segment"),
+            .init(labelRaw: "中東", amount: 10_822, share: nil, profit: nil, rowKind: "segment"),
+            .init(labelRaw: "その他", amount: 25_803, share: nil, profit: nil, rowKind: "segment"),
+            .init(labelRaw: "その他/エジプト", amount: 17_438, share: nil, profit: nil, rowKind: "segment"),
+        ]
+        let filtered = GeographyBreakdownLLMNormalizer.keepOfWhichSubsetAsSubtotals(rows)
+        #expect(filtered.filter { $0.rowKind == "segment" }.map(\.labelRaw)
+            == ["日本", "アジア", "中東", "その他"])
+        let egypt = try #require(filtered.first { $0.category == "エジプト" })
+        #expect(egypt.categoryGroup == "その他")
+    }
+
     @Test("うちラベルは比率が低くても内数 subtotal にする")
     func keepsUchiLabeledChildAsSubtotalEvenWhenRatioIsLow() throws {
         let rows: [BreakdownRow] = [
