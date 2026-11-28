@@ -151,6 +151,8 @@ enum SegmentV3 {
             }
         }
 
+        demoteAggregateParents(&rows, fallbackTotal: segment.denominator)
+
         applyExplicitZeros(&rows)
         let differenced = addDifferenceRows(
             rows, edinetCode: edinetCode,
@@ -204,6 +206,27 @@ enum SegmentV3 {
             total: assignment.total, categories: assignment.categories)
         out.capitalExpendituresOverview = nil
         return out
+    }
+
+    /// 表由来（LLM）の骨格に XBRL の member が足されたあと、子の合計に一致する親・合計の行
+    /// （「連結（非継続事業調整前）」「TotalOfReportableSegments…」など）が segment のまま残り、
+    /// 連結を 5% 超える二重計上になっているとき、その行を `subtotal` にする。判定は
+    /// `BreakdownNormalizer.demoteAggregateParentSegments`（社名・member 名は見ない）。
+    static func demoteAggregateParents(_ rows: inout [BreakdownRowPayload], fallbackTotal: Double) {
+        let entity = rows.first { $0.rowKind == breakdownRowKindEntityTotal }?.amount
+        let total = (entity ?? 0) > 0 ? entity : (fallbackTotal > 0 ? fallbackTotal : nil)
+        var kinds: [String: String] = [:]
+        var amounts: [String: Double] = [:]
+        for (index, row) in rows.enumerated()
+        where row.rowKind == "segment" || row.rowKind == "reconciling" {
+            kinds["\(index)"] = row.rowKind
+            amounts["\(index)"] = row.amount
+        }
+        BreakdownNormalizer.demoteAggregateParentSegments(
+            kinds: &kinds, amounts: amounts, total: total)
+        for (key, kind) in kinds where kind == "subtotal" {
+            if let index = Int(key) { rows[index].rowKind = "subtotal" }
+        }
     }
 
     /// 応答で単一か複数かが分かるようにする。90%省略の 1 行は `disclosure_basis` が既に言うので付けない。
