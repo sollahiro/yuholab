@@ -70,4 +70,22 @@ struct SegmentRowKindLabelTests {
             kinds: &kinds, amounts: amounts, total: 250)
         #expect(kinds.values.allSatisfy { $0 == "segment" })
     }
+
+    @Test func llmSkeletonAggregateRowsBecomeSubtotals() {
+        func row(_ label: String, _ amount: Double, kind: String = "segment") -> BreakdownRowPayload {
+            BreakdownRowPayload(labelRaw: label, label: label, amount: amount, profit: nil, rowKind: kind)
+        }
+        // 「連結（非継続事業調整前）」が子の合計に一致して segment のまま残り、連結を超える。
+        var rows = [
+            row("海外", 35_514), row("機電・IT", 91_064), row("建設", 44_994), row("製造", 7_993),
+            row("その他", 1_650), row("非継続事業へ振替", -7_993),
+            row("連結（非継続事業調整前）", 181_219), row("調整額", 2, kind: "reconciling"),
+            row("EntityTotal", 173_225, kind: breakdownRowKindEntityTotal),
+        ]
+        SegmentV3.demoteAggregateParents(&rows, fallbackTotal: 0)
+        #expect(rows.first { $0.label == "連結（非継続事業調整前）" }?.rowKind == "subtotal")
+        #expect(rows.first { $0.label == "海外" }?.rowKind == "segment")
+        // 偶然の部分和一致（建設≈海外+製造+その他）の行は落とさない。
+        #expect(rows.first { $0.label == "建設" }?.rowKind == "segment")
+    }
 }

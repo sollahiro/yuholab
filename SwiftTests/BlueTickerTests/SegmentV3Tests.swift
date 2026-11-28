@@ -318,8 +318,10 @@ import Testing
             segment: segment, assets: nil, capitalExpenditures: nil,
             noncurrentAssetAdditions: nil, overview: nil, overviewTotal: nil, equityMethod: nil,
             external: external, edinetCode: "E00001", memberPrefixes: [:], labelsByTag: [:])
+        // 親（389,586 = 油脂・油糧 + 加工食品・素材）は子と並ぶと連結を超えるので小計にする。
         let segments = assembled.rows.filter { $0.rowKind == "segment" }
-        #expect(segments.count == 5)
+        #expect(segments.count == 4)
+        #expect(assembled.rows.first { $0.label == "油脂・油糧および加工食品・素材事業" }?.rowKind == "subtotal")
         #expect(segments.allSatisfy { $0.profit != nil })
         let oils = segments.first { $0.label == "油脂・油糧および加工食品・素材事業 / 油脂・油糧" }
         #expect(oils?.externalSales?.value == 311_544)

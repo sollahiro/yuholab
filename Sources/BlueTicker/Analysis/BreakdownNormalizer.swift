@@ -1124,7 +1124,7 @@ enum BreakdownNormalizer {
     }
 
     /// 親セグメント（他の 2 つ以上の segment の合計に ±0.5% で一致する member）を、子と同居して
-    /// 二重計上になるときだけ `subtotal` にする。親候補をまとめて落とした和が連結の ±5% に
+    /// 二重計上になるときだけ `subtotal` にする。親候補を金額の大きい順に落として和が連結の ±5% に
     /// 収まるときだけ採用する（偶然の一致で落とさない）。連結売上が無い・既に ±5% 内なら何もしない。
     static func demoteAggregateParentSegments(
         kinds: inout [String: String], amounts: [String: Double], total: Double?
@@ -1139,11 +1139,17 @@ enum BreakdownNormalizer {
             return hasSubsetSum(of: others, near: amounts[parent]!, minCount: 2)
         }
         guard !parents.isEmpty else { return }
+        // 偶然の部分和一致を避けるため、金額の大きい親候補から 1 つずつ落とし、
+        // 連結の ±5% に収まった時点で止める（収まらなければ何も落とさない）。
         var trial = kinds
-        for parent in parents { trial[parent] = "subtotal" }
-        let sum = reconciledAmount(kinds: trial, amounts: amounts)
-        guard sum > 0, abs(sum - total) / total <= 0.05 else { return }
-        kinds = trial
+        for parent in parents.sorted(by: { amounts[$0]! > amounts[$1]! }) {
+            trial[parent] = "subtotal"
+            let sum = reconciledAmount(kinds: trial, amounts: amounts)
+            if sum > 0, abs(sum - total) / total <= 0.05 {
+                kinds = trial
+                return
+            }
+        }
     }
 
     /// `values` のうち `minCount` 個以上の部分集合の和が `target` の ±0.5% に収まるか。
