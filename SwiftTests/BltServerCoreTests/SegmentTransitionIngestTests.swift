@@ -131,7 +131,7 @@ private func seedYear(
             let judge: SegmentReorgJudge = { question, previousDocID, docID, judged in
                 await calls.record([previousDocID, docID])
                 return question.old.flatMap { old in
-                    question.new.filter { !judged.contains([old.key, $0.key]) }.map { new in
+                    question.new.filter { !judged.contains([old.key, $0.key]) && !question.linked.contains([old.key, $0.key]) }.map { new in
                         SegmentReorgVerdict(
                             oldKey: old.key, newKey: new.key,
                             decision: old.key.hasSuffix("AlphaMember") && new.key.hasSuffix("GammaMember")

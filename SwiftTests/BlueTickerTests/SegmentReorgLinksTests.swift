@@ -96,16 +96,18 @@ private actor ReorgAnswers: SegmentReorgDeciding {
 
     private var new: BreakdownSnapshotPayload {
         payload([
-            row("TE", "通信・エネルギー事業", 120), row("SHOP", "店舗・施設ソリューション事業", 90),
-            row("FIN", "金融事業", 10),
+            // 旧と新の合計が合う部分集合が無い値（金額で組に分けられず regroup のまま）。
+            row("TE", "通信・エネルギー事業", 200), row("SHOP", "店舗・施設ソリューション事業", 15),
+            row("FIN", "金融事業", 5),
         ])
     }
 
-    @Test func asksOnlyUnresolvedOldSegmentsAndKeepsManyToManyAnswers() async throws {
+    @Test func asksEveryUnlinkedPairAndKeepsManyToManyAnswers() async throws {
         let question = try #require(
             SegmentWaterfall.reorgQuestion(
                 fyEnd: "2025-08-31", previous: ("2024-08-31", "A", old), payload: new, transitions: []))
-        #expect(question.old.map(\.key) == ["BIZ", "SHOP0"])
+        #expect(question.old.map(\.key) == ["TEL", "BIZ", "SHOP0"])
+        #expect(question.linked == [["TEL", "TE"]])
         let decider = ReorgAnswers(movedPairs: [
             ["業務用システム事業", "店舗・施設ソリューション事業"], ["店舗サービス事業", "店舗・施設ソリューション事業"],
             ["店舗サービス事業", "金融事業"],
@@ -113,7 +115,8 @@ private actor ReorgAnswers: SegmentReorgDeciding {
         let verdicts = await SegmentReorgJev.judge(
             question, previousFilingText: "前", currentFilingText: "当",
             skipping: [["BIZ", "TE"]], decider: decider)
-        #expect(verdicts.count == 5)
+        // 3 × 3 組から、名称で決まった 1 組と判定済みの 1 組を除く。
+        #expect(verdicts.count == 7)
         #expect(
             verdicts.filter { $0.decision == segmentTransitionDecisionSuccessor }
                 .map { [$0.oldKey, $0.newKey] }

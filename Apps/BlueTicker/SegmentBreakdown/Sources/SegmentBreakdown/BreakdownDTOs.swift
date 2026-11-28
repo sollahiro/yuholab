@@ -37,6 +37,7 @@ struct SegmentWaterfallResponse: Codable {
     struct ReorgLink: Codable {
         var from: String?
         var to: String?
+        var basis: String?
     }
 
     /// `kind` は merge（旧 2 以上・新 1）/ split / replace / regroup。

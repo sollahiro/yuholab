@@ -99,8 +99,9 @@ private func writeSegmentTransitions(
                         guard let old = row.oldKey, let new = row.newKey else { return nil }
                         return [old, new]
                     })
+            let skip = judged.union(question.linked)
             question.old = question.old.filter { old in
-                question.new.contains { !judged.contains([old.key, $0.key]) }
+                question.new.contains { !skip.contains([old.key, $0.key]) }
             }
             if !question.old.isEmpty {
                 pending.append(

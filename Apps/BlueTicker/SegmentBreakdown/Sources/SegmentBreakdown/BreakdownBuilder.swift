@@ -50,8 +50,12 @@ enum BreakdownBuilder {
 
     /// API の `reorg_links[]`（複数対複数の再編で、どの旧区分がどの新区分へ移ったか）。
     private static func links(_ year: SegmentWaterfallResponse.Year) -> [BreakdownReorgLink] {
-        (year.reorgLinks ?? []).compactMap { link in
-            guard let from = link.from, let to = link.to else { return nil }
+        let all = year.reorgLinks ?? []
+        // 位置と色は主な移り先で決める。名称か同じキーで決まった旧区分は、Jev の組（一部の移動）には寄せない。
+        let primary = Set(all.filter { $0.basis != "jev" }.compactMap(\.from))
+        return all.compactMap { link in
+            guard let from = link.from, let to = link.to, link.basis != "jev" || !primary.contains(from)
+            else { return nil }
             return BreakdownReorgLink(fromKey: from, toKey: to)
         }
     }

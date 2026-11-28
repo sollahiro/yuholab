@@ -4,7 +4,7 @@
 
 import Foundation
 
-/// 判定する再編 1 年分。`old` は移り先が未定の旧区分、`new` は当年の再編の新区分。
+/// 判定する再編 1 年分。`old` は再編の旧区分、`new` は当年の新区分、`linked` はコードで決まっていて聞かない組。
 public struct SegmentReorgQuestion: Equatable, Sendable {
     public struct Segment: Equatable, Sendable {
         public var key: String
@@ -20,7 +20,10 @@ public struct SegmentReorgQuestion: Equatable, Sendable {
     public var old: [Segment]
     public var new: [Segment]
 
-    public init(fyEnd: String, old: [Segment], new: [Segment]) {
+    public var linked: Set<[String]>
+
+    public init(fyEnd: String, old: [Segment], new: [Segment], linked: Set<[String]> = []) {
+        self.linked = linked
         self.fyEnd = fyEnd
         self.old = old
         self.new = new
@@ -73,7 +76,8 @@ enum SegmentReorgJev {
     ) async -> [SegmentReorgVerdict] {
         var verdicts: [SegmentReorgVerdict] = []
         for old in question.old {
-            for new in question.new where !judged.contains([old.key, new.key]) {
+            for new in question.new
+            where !judged.contains([old.key, new.key]) && !question.linked.contains([old.key, new.key]) {
                 let pair = SegmentReorgPair(
                     oldLabel: old.label, newLabel: new.label,
                     allOldLabels: question.old.map(\.label), allNewLabels: question.new.map(\.label),
