@@ -218,6 +218,8 @@ private struct RegionOmittedCard: View {
         switch reason {
         case "unavailable":
             return "地域別売上高は未取得です。"
+        case "same_as_segment":
+            return "有価証券報告書では、地域ごとの情報はセグメント情報と同じとして省略されています。セグメント別売上高をご覧ください。"
         case "domestic_dominant_90pct":
             return "本邦の外部顧客への売上高が連結売上高の90%を超えるため、有価証券報告書では地域ごとの売上高を開示していません。"
         default:
@@ -225,9 +227,17 @@ private struct RegionOmittedCard: View {
         }
     }
 
+    private var headline: String {
+        switch reason {
+        case "unavailable": return "未取得"
+        case "same_as_segment": return "セグメント情報に同じ"
+        default: return "地域別の開示なし"
+        }
+    }
+
     var body: some View {
         AnalysisCard(title: "地域別売上高") {
-            Text(reason == "unavailable" ? "未取得" : "地域別の開示なし")
+            Text(headline)
                 .font(.headline)
                 .foregroundStyle(Theme.text)
             AnalysisNote(text: note)

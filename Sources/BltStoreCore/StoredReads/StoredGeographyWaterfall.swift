@@ -18,7 +18,12 @@ package func loadStoredGeographyWaterfall(
     switch try await loadStoredBreakdown(
         code: code4, docId: nil, axis: breakdownAxisGeography, db: db)
     {
-    case .found: latestStatus = geographyLatestStatusOk
+    case .found(let value):
+        // 地域ごとの情報がセグメント情報と同じとして省略された書類（行は無く `same_as: segment` だけ）。
+        let breakdown = value["breakdown"] as? [String: Any]
+        latestStatus =
+            breakdown?[breakdownSameAsKey] != nil
+            ? geographyLatestStatusSameAsSegment : geographyLatestStatusOk
     case .notApplicable(let reason): latestStatus = reason
     case .withheld, .absent: latestStatus = geographyLatestStatusUnavailable
     }
@@ -39,5 +44,7 @@ package func loadStoredGeographyWaterfall(
 
 /// 最新期の地域別が実データとして読める。
 let geographyLatestStatusOk = "ok"
+/// 最新期の地域別が「セグメント情報に同じ」として省略されている（`same_as: segment`）。404 の reason にも同じ値を使う。
+let geographyLatestStatusSameAsSegment = "same_as_segment"
 /// 最新期の地域別が未取得（行が無い・公開できない）。省略（`domestic_dominant_90pct` など）以外の 404。
 let geographyLatestStatusUnavailable = "unavailable"
