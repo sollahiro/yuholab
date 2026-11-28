@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// 銘柄ページ最下部の「関連企業」カード。有報の記載に基づく仕入先・出資先・被保有・大株主を、
+/// 銘柄ページ最下部の「関連企業」カード。有報の記載に基づく取引先（販売先・仕入先をバッジで区別）・出資先・被保有・大株主を、
 /// 種別ごとに上位 10 件まで出す。上場企業に名寄せできた相手はタップでその銘柄へ進む。
 /// 取得は選んだ種別だけ（`GET /v1/companies/{code}/relations?type=`）。
 struct RelationsCard: View {
     var code: String
 
-    @State private var kind: RelationKind = .supplier
+    @State private var kind: RelationKind = .trading
     @State private var states: [RelationKind: RelationsLoadState] = [:]
 
     var body: some View {
@@ -47,13 +47,34 @@ struct RelationsCard: View {
         .onChange(of: code) { states = [:] }
     }
 
+    /// 取引先は販売先（customer）と仕入先（supplier）を別々に取り、1 つのリストにまとめる。
+    /// どちらか片方が 404（記載なし）でももう片方は出す。
+    private func fetchRows(_ kind: RelationKind) async throws -> [RelationRow] {
+        let code = code
+        var items: [CompanyRelationItem] = []
+        var firstError: Error?
+        var hadSuccess = false
+        for type in kind.apiTypes {
+            do {
+                let response = try await APIClient.shared.relations(
+                    code: code, type: type, limit: kind.fetchLimit)
+                items += response.relations
+                hadSuccess = true
+            } catch APIClientError.http(let status, _) where status == 404 {
+                hadSuccess = true
+            } catch {
+                firstError = firstError ?? error
+            }
+        }
+        if !hadSuccess, let firstError { throw firstError }
+        return RelationRow.rows(from: items, kind: kind)
+    }
+
     private func load(_ kind: RelationKind) async {
         if case .loaded = states[kind] { return }
         states[kind] = .loading
         do {
-            let response = try await APIClient.shared.relations(
-                code: code, type: kind.apiType, limit: kind.fetchLimit)
-            let rows = RelationRow.rows(from: response.relations, kind: kind)
+            let rows = try await fetchRows(kind)
             states[kind] = rows.isEmpty ? .empty : .loaded(rows)
         } catch APIClientError.http(let status, _) where status == 404 {
             states[kind] = .empty
@@ -74,14 +95,21 @@ enum RelationsLoadState {
     case loaded([RelationRow])
 }
 
+enum RelationTag: String {
+    case customer, supplier
+
+    var title: String { self == .customer ? "販売先" : "仕入先" }
+    var color: Color { self == .customer ? Theme.accent : Theme.textMuted }
+}
+
 enum RelationKind: String, CaseIterable, Identifiable {
-    case supplier, investee, heldBy, majorShareholder
+    case trading, investee, heldBy, majorShareholder
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .supplier: "仕入先"
+        case .trading: "取引先"
         case .investee: "出資先"
         case .heldBy: "被保有"
         case .majorShareholder: "大株主"
@@ -89,12 +117,12 @@ enum RelationKind: String, CaseIterable, Identifiable {
     }
 
     /// REST の `type`。
-    var apiType: String {
+    var apiTypes: [String] {
         switch self {
-        case .supplier: "supplier"
-        case .investee: "investee"
-        case .heldBy: "investee_of"
-        case .majorShareholder: "major_shareholder"
+        case .trading: ["customer", "supplier"]
+        case .investee: ["investee"]
+        case .heldBy: ["investee_of"]
+        case .majorShareholder: ["major_shareholder"]
         }
     }
 
@@ -103,7 +131,7 @@ enum RelationKind: String, CaseIterable, Identifiable {
 
     var emptyText: String {
         switch self {
-        case .supplier: "他社の有報で、主要な顧客として載っている記載はありません"
+        case .trading: "主要な顧客（販売先）・仕入先の記載はありません"
         case .investee: "政策保有株式の記載はありません"
         case .heldBy: "他社の有報の政策保有株式に、この会社の株式が載っている記載はありません"
         case .majorShareholder: "大株主の記載はありません"
@@ -112,7 +140,7 @@ enum RelationKind: String, CaseIterable, Identifiable {
 
     var note: String {
         switch self {
-        case .supplier: "他社の有報の「主要な顧客」に、この会社が載っている相手。金額は相手の売上のうちこの会社向け。"
+        case .trading: "販売先は、この会社の有報の「主要な顧客」。仕入先は、他社の有報の「主要な顧客」にこの会社が載っている相手。金額は売上のうち販売先向け・仕入先の売上のうちこの会社向け（開示があるときのみ）。"
         case .investee: "政策保有株式（純投資以外）の銘柄。金額は貸借対照表計上額。"
         case .heldBy: "他社の有報の政策保有株式に、この会社の株式が載っている上場会社。金額は相手が持つこの会社の株式の計上額。載るのは各社の開示の範囲（主に保有額の上位）のみ。"
         case .majorShareholder: "名義上の上位株主。割合は発行済株式に対する持株比率。"
@@ -126,15 +154,25 @@ struct RelationRow: Identifiable {
     /// 上場企業に名寄せできた相手。nil は非上場・未名寄せ（遷移しない）。
     var company: CompanyRef?
     var value: String?
+    /// 取引先の区分（販売先 / 仕入先）。取引先以外は nil。
+    var tag: RelationTag?
 
     static let maxCount = 10
 
     static func rows(from items: [CompanyRelationItem], kind: RelationKind) -> [RelationRow] {
         var seen = Set<String>()
         var result: [RelationRow] = []
-        for (index, item) in items.enumerated() {
-            // 同じ上場会社が複数行（例: みなし保有）のときは先頭だけ。
-            if let code = item.company?.code, !seen.insert(code).inserted { continue }
+        // 取引先は販売先・仕入先を金額の降順で 1 リストにする（安定ソート）。
+        let ordered = kind == .trading
+            ? items.enumerated().sorted {
+                ($0.element.amountYen ?? -1, -$0.offset) > ($1.element.amountYen ?? -1, -$1.offset)
+            }.map(\.element)
+            : items
+        for (index, item) in ordered.enumerated() {
+            // 同じ上場会社が複数行（例: みなし保有）のときは先頭だけ。取引先は区分ごとに数える。
+            if let code = item.company?.code,
+                !seen.insert("\(item.type)|\(code)").inserted
+            { continue }
             result.append(
                 RelationRow(
                     id: "\(kind.rawValue)|\(index)",
@@ -142,7 +180,8 @@ struct RelationRow: Identifiable {
                     company: item.company.map {
                         CompanyRef(code: $0.code, name: $0.name, sector: "")
                     },
-                    value: value(item, kind: kind)))
+                    value: value(item, kind: kind),
+                    tag: kind == .trading ? RelationTag(rawValue: item.type) : nil))
             if result.count == maxCount { break }
         }
         return result
@@ -150,7 +189,7 @@ struct RelationRow: Identifiable {
 
     private static func value(_ item: CompanyRelationItem, kind: RelationKind) -> String? {
         switch kind {
-        case .supplier:
+        case .trading:
             return item.amountYen.map { Format.okuYen($0) }
         case .investee, .heldBy:
             return item.investee?.bookValueYen.map { Format.okuYen($0) }
@@ -197,10 +236,21 @@ private struct RelationRowView: View {
                     .font(.subheadline)
                     .foregroundStyle(row.company == nil ? Theme.textMuted : Theme.text)
                     .lineLimit(2)
-                if let company = row.company {
-                    Text(company.code)
-                        .font(.caption)
-                        .foregroundStyle(Theme.textMuted)
+                HStack(spacing: 6) {
+                    if let tag = row.tag {
+                        Text(tag.title)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(tag.color)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .overlay(
+                                Capsule().stroke(tag.color.opacity(0.6), lineWidth: 1))
+                    }
+                    if let company = row.company {
+                        Text(company.code)
+                            .font(.caption)
+                            .foregroundStyle(Theme.textMuted)
+                    }
                 }
             }
             Spacer(minLength: 8)
