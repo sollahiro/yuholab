@@ -141,10 +141,11 @@ enum Format {
         return stripped
     }
 
-    /// 全角の英数字・記号（U+FF01〜FF5E）だけを半角にする。全角カナは変えない。
+    /// 全角の英数字・記号（U+FF01〜FF5E）と全角スペース（U+3000）だけを半角にする。全角カナは変えない。
     static func halfwidthASCII(_ text: String) -> String {
         String(String.UnicodeScalarView(text.unicodeScalars.map { scalar in
-            (0xFF01...0xFF5E).contains(scalar.value)
+            if scalar.value == 0x3000 { return " " }
+            return (0xFF01...0xFF5E).contains(scalar.value)
                 ? Unicode.Scalar(scalar.value - 0xFEE0) ?? scalar : scalar
         }))
     }
