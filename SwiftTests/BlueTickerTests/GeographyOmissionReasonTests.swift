@@ -119,6 +119,11 @@ import Testing
             heading: "地域ごとの情報",
             markdown: "| (単位：百万円) | | | |\n|---|---|---|---|\n| 日本 | 北米 | アジア | 合計 |\n| 86,328 | 8,296 | 32,271 | 126,895 |", period: "当期")
         #expect(BreakdownExtractor.tableHasRegionColumnHeaders(unitAbove))
+        // source: code=7599 doc_id=S100O5E0 page=0 field=major_customers (主要な顧客の表。値の列に日本が出る)
+        let customers = BreakdownTable(
+            heading: "主要な顧客ごとの情報",
+            markdown: "| 顧客の名称又は氏名 | 売上高 | 関連するセグメント名 |\n|---|---|---|\n| 株式会社ユー・エス・エス | 5,000 | 日本 |", period: "当期")
+        #expect(!BreakdownExtractor.tableHasRegionColumnHeaders(customers))
         let impairment = BreakdownTable(
             heading: "減損損失",
             markdown: "| 減損損失 | 日本 | 米国 | その他 | 合計 |\n|---|---|---|---|---|\n| 減損損失 | 1 | 2 | 3 | 6 |", period: "当期")

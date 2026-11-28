@@ -1410,7 +1410,7 @@ enum BreakdownExtractor {
     /// 有形固定資産の同形の表は、見出しと直前キャプションの除外で落とす（`mixedSkipNearestAssetCaptionTables`）。
     static func tableHasRegionColumnHeaders(_ table: BreakdownTable) -> Bool {
         // 減損損失・のれん・償却の表は地域列でも売上ではない（5632 の近傍表）。
-        let nonSalesWords = ["減損", "のれん", "償却", "固定資産", "資産"]
+        let nonSalesWords = ["減損", "のれん", "償却", "固定資産", "資産", "顧客", "相手先", "セグメント名", "氏名", "名称"]
         let head = table.markdown.split(separator: "\n").prefix(8).joined()
         if nonSalesWords.contains(where: head.contains) { return false }
         for line in table.markdown.split(separator: "\n", omittingEmptySubsequences: false) {
@@ -1425,7 +1425,10 @@ enum BreakdownExtractor {
             }
             if numeric.count >= 2 { return false }
             guard cells.count >= 3 else { continue }
-            if cells.contains(where: { ["日本", "国内", "本邦"].contains(where: $0.contains) }) {
+            // 見出しのセル全体が地域名（国内(日本) など短い表記まで）。表の値の列に日本が出るだけの表は除く。
+            if cells.contains(where: { cell in
+                cell.count <= 8 && ["日本", "国内", "本邦"].contains(where: cell.contains)
+            }) {
                 return true
             }
         }
