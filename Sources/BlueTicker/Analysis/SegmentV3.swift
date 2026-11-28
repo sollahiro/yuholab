@@ -63,9 +63,11 @@ enum SegmentV3 {
 
         for source in segment.rows {
             let kind = SegmentMemberKind.classify(localName: source.labelRaw, label: source.label)
+            // 上流（親子の二重計上の判定）が小計へ落とした行を、名称分類で segment に戻さない。
+            let upstreamSubtotal = kind == .segment && source.rowKind == "subtotal"
             let position = ensureRow(
                 localName: source.labelRaw, label: source.label,
-                rowKind: SegmentMemberKind.rowKind(kind))
+                rowKind: upstreamSubtotal ? "subtotal" : SegmentMemberKind.rowKind(kind))
             rows[position].amount = source.amount
             rows[position].profit = source.profit
             rows[position].segmentBasis = source.segmentBasis

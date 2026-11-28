@@ -170,6 +170,12 @@ enum BreakdownNormalizer {
             }
         }
 
+        // 3次判定（親子の二重計上）: 報告セグメントの親（子の合計に一致する member）が子と同居し、
+        // 足すと連結を 5% 超えるとき、親を小計に落とす（花王 S100VFNW: コンシューマープロダクツ事業が
+        // 化粧品・HBC・ハイジーン・ライフケアの親）。社名・member 名は見ない。
+        demoteAggregateParentSegments(
+            kinds: &kinds, amounts: perMember.mapValues(\.value), total: consolidatedSales)
+
         // 高島屋型: 財務取り込み が NetSales（売上高）を取る一方、セグメント注記の
         // RevenuesFromExternalCustomers は営業収益ベース。財務取り込み 売上を分母にしたままだと
         // amount/denominator が 1 を大きく超え比較不能になる（実データ: S100Y4X5、2026-07-25）。
@@ -1115,6 +1121,40 @@ enum BreakdownNormalizer {
         (label ?? "")
             .replacingOccurrences(of: " ", with: "")
             .replacingOccurrences(of: "　", with: "")
+    }
+
+    /// 親セグメント（他の 2 つ以上の segment の合計に ±0.5% で一致する member）を、子と同居して
+    /// 二重計上になるときだけ `subtotal` にする。親候補をまとめて落とした和が連結の ±5% に
+    /// 収まるときだけ採用する（偶然の一致で落とさない）。連結売上が無い・既に ±5% 内なら何もしない。
+    static func demoteAggregateParentSegments(
+        kinds: inout [String: String], amounts: [String: Double], total: Double?
+    ) {
+        guard let total, total > 0 else { return }
+        let included = reconciledAmount(kinds: kinds, amounts: amounts)
+        guard included > 0, abs(included - total) / total > 0.05 else { return }
+        let segments = amounts.keys.filter { kinds[$0] == "segment" && (amounts[$0] ?? 0) > 0 }.sorted()
+        guard segments.count >= 3, segments.count <= 16 else { return }
+        let parents = segments.filter { parent in
+            let others = segments.filter { $0 != parent }.map { amounts[$0]! }
+            return hasSubsetSum(of: others, near: amounts[parent]!, minCount: 2)
+        }
+        guard !parents.isEmpty else { return }
+        var trial = kinds
+        for parent in parents { trial[parent] = "subtotal" }
+        let sum = reconciledAmount(kinds: trial, amounts: amounts)
+        guard sum > 0, abs(sum - total) / total <= 0.05 else { return }
+        kinds = trial
+    }
+
+    /// `values` のうち `minCount` 個以上の部分集合の和が `target` の ±0.5% に収まるか。
+    private static func hasSubsetSum(of values: [Double], near target: Double, minCount: Int) -> Bool {
+        let tolerance = target * 0.005
+        for mask in 1..<(1 << values.count) where mask.nonzeroBitCount >= minCount {
+            var sum = 0.0
+            for (i, v) in values.enumerated() where mask & (1 << i) != 0 { sum += v }
+            if abs(sum - target) <= tolerance { return true }
+        }
+        return false
     }
 
     /// 子セグメントと同居する親小計を subtotal へ落とす。含めると分母から 5% 超ずれ、
