@@ -30,11 +30,18 @@ import Testing
         #expect(media.map(\.toKey) == ["SNS", "XR"])
     }
 
-    @Test func genericWordsAndPartialWordsDoNotLink() {
+    @Test func partsSharedBySeveralNamesAndPartialWordsDoNotLink() {
         let links = SegmentReorgLinks.deterministic(
-            from: [("A", "その他の事業"), ("B", "情報・システム事業"), ("C", "店舗サービス事業")],
-            to: [("X", "その他"), ("Y", "業務・システム事業"), ("Z", "店舗・施設ソリューション事業")])
+            from: [("A", "情報・システム事業"), ("B", "制御・システム事業"), ("C", "店舗サービス事業")],
+            to: [("X", "業務・システム事業"), ("Y", "店舗・施設ソリューション事業")])
         #expect(links.isEmpty)
+    }
+
+    @Test func suffixSharedByEveryNameIsDroppedWithoutAWordList() {
+        let parts = SegmentReorgLinks.nameParts(
+            old: ["通信セグメント"], new: ["情報通信セグメント", "エネルギーセグメント"])
+        #expect(parts.old == [["通信"]])
+        #expect(parts.new == [["情報通信"], ["エネルギー"]])
     }
 }
 
