@@ -12,34 +12,103 @@ import Logging
 /// タイムアウトし、再試行も先頭からやり直しになって取り込みが毎回異常終了する。
 /// 1 社の処理は、既存行との差分があるときだけ書き直すので、再試行しても結果は同じ。
 func runSegmentTransitionIngest(
-    db: Database, listedCodes: Set<String>, logger: Logger? = nil
+    db: Database, listedCodes: Set<String>, logger: Logger? = nil,
+    judge: SegmentReorgJudge? = nil
 ) async throws {
     for code in listedCodes.sorted() {
-        try await withDbRetry(logger: logger, context: "company_segment_transitions code=\(code)") {
+        let pending = try await withDbRetry(
+            logger: logger, context: "company_segment_transitions code=\(code)"
+        ) {
             try await writeSegmentTransitions(code: code, db: db, logger: logger)
         }
+        guard let judge else { continue }
+        // 書類の取得と Jev の呼び出しは長いので、DB の再試行・タイムアウトの外で行う。
+        for item in pending {
+            let verdicts = await judge(item.question, item.previousDocID, item.docID, item.judged)
+            guard !verdicts.isEmpty else { continue }
+            try await withDbRetry(
+                logger: logger, context: "company_segment_transitions successor code=\(code)"
+            ) {
+                try await writeSuccessors(verdicts, code: code, fyEnd: item.question.fyEnd, db: db)
+            }
+        }
+    }
+}
+
+/// 移り先の判定（問い・前年の docID・当年の docID・判定済みの組 → 結果）。
+typealias SegmentReorgJudge = @Sendable (
+    SegmentReorgQuestion, String, String, Set<[String]>
+) async -> [SegmentReorgVerdict]
+
+private struct PendingReorg: Sendable {
+    var question: SegmentReorgQuestion
+    var previousDocID: String
+    var docID: String
+    var judged: Set<[String]>
+}
+
+/// 同じ組の行があれば置き換える（再試行しても結果は同じ）。
+private func writeSuccessors(
+    _ verdicts: [SegmentReorgVerdict], code: String, fyEnd: String, db: Database
+) async throws {
+    for verdict in verdicts {
+        // 年のつなぎの行（同じ旧・新の組がありうる）と ID を分ける。
+        let id = CompanySegmentTransition.compositeID(
+            code: code, fyEnd: fyEnd, oldKey: verdict.oldKey, newKey: verdict.newKey)
+            + "#successor"
+        try await CompanySegmentTransition.find(id, on: db)?.delete(on: db)
+        let model = CompanySegmentTransition(
+            code: code, fyEnd: fyEnd, oldKey: verdict.oldKey, newKey: verdict.newKey)
+        model.id = id
+        model.decision = verdict.decision
+        model.basis = segmentTransitionBasisJev
+        model.matched = segmentTransitionMatchedReorg
+        model.needsReview = verdict.decision == segmentTransitionDecisionSuccessorReview
+        try await model.create(on: db)
     }
 }
 
 private func writeSegmentTransitions(
     code: String, db: Database, logger: Logger?
-) async throws {
+) async throws -> [PendingReorg] {
     // 年次応答（`loadStoredSegmentWaterfall`）と同じ年の並びでつなぐ。決算期ごとに 1 書類、
     // 公開面に出ない行は飛ばす。書類の提出順で隣を取ると、同じ期の書類が 2 つあるときに
     // 前年とのつなぎが消える。
     let years = Array(try await loadServableSegmentYears(code: code, db: db).reversed())
-    guard years.count >= 2 else { return }
+    guard years.count >= 2 else { return [] }
     var written = 0
+    var pending: [PendingReorg] = []
     for index in years.indices.dropFirst() {
         let previous = years[index - 1]
         let current = years[index]
         let drafts = SegmentTransitionMatcher.match(
             oldRows: previous.payload.rows, newRows: current.payload.rows,
             fyEnd: current.fyEnd)
-        let existing = try await CompanySegmentTransition.query(on: db)
+        let stored = try await CompanySegmentTransition.query(on: db)
             .filter(\.$code == code)
             .filter(\.$fyEnd == current.fyEnd)
             .all()
+        let existing = stored.filter { !segmentTransitionSuccessorDecisions.contains($0.decision) }
+        // 移り先の判定は残す。判定済みの組は聞き直さない。
+        if var question = SegmentWaterfall.reorgQuestion(
+            fyEnd: current.fyEnd, previous: previous, payload: current.payload, transitions: drafts)
+        {
+            let judged = Set(
+                stored.filter { segmentTransitionSuccessorDecisions.contains($0.decision) }
+                    .compactMap { row -> [String]? in
+                        guard let old = row.oldKey, let new = row.newKey else { return nil }
+                        return [old, new]
+                    })
+            question.old = question.old.filter { old in
+                question.new.contains { !judged.contains([old.key, $0.key]) }
+            }
+            if !question.old.isEmpty {
+                pending.append(
+                    PendingReorg(
+                        question: question, previousDocID: previous.docID, docID: current.docID,
+                        judged: judged))
+            }
+        }
         if sameTransitions(existing, drafts) { continue }
         for row in existing {
             try await row.delete(on: db)
@@ -61,6 +130,7 @@ private func writeSegmentTransitions(
             "code": .string(code), "pairs": .stringConvertible(years.count - 1),
             "rewritten": .stringConvertible(written),
         ])
+    return pending
 }
 
 /// 格納済みの行と今回の判定が同じか。同じなら書き直さない（毎回の delete / insert を避ける）。
