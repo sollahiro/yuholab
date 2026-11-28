@@ -142,9 +142,9 @@ private func seedYear(
                 }
             }
             try await runSegmentTransitionIngest(db: db, listedCodes: ["1234"], judge: judge)
-            let first = try await CompanySegmentTransition.query(on: db).all()
+            let first = try await CompanySegmentTransition.query(on: db).filter(\.$code == "1234").all()
             try await runSegmentTransitionIngest(db: db, listedCodes: ["1234"], judge: judge)
-            let second = try await CompanySegmentTransition.query(on: db).all()
+            let second = try await CompanySegmentTransition.query(on: db).filter(\.$code == "1234").all()
 
             #expect(await calls.values == [["S2025", "S2026"]])
             #expect(Set(first.compactMap(\.id)) == Set(second.compactMap(\.id)))
