@@ -3795,10 +3795,8 @@ extension BreakdownExtractor {
                 parser.delegate = collector
                 parser.parse()
                 for block in collector.blocks {
-                    // 区分ごとの金額表は別の材料（区分名と売上の一覧）で渡す。説明の文だけにする。
-                    let withoutTables = block.content.replacingOccurrences(
-                        of: "(?is)<table\\b.*?</table>", with: " ",
-                        options: [.regularExpression])
+                    // 金額の表は別の材料（区分名と売上の一覧）で渡す。文字の表（区分ごとの製品・事業の表）は残す。
+                    let withoutTables = textOnlyTables(block.content)
                     let text = DescriptionOfBusinessExtractor.htmlToText(withoutTables)
                     guard let start = text.range(of: "報告セグメント") else { continue }
                     return String(text[start.lowerBound...].prefix(limit))
@@ -3809,6 +3807,37 @@ extension BreakdownExtractor {
     }
 
     static let segmentNoteOverviewTextLimit = 6000
+
+    /// 表のうち、数字のセルが半分以上のもの（金額・構成の表）を除く。文字が中心の表は残す。
+    static func textOnlyTables(_ html: String) -> String {
+        guard let table = try? NSRegularExpression(
+            pattern: "<table\\b.*?</table>", options: [.dotMatchesLineSeparators, .caseInsensitive]),
+            let cell = try? NSRegularExpression(
+                pattern: "<t[dh]\\b[^>]*>(.*?)</t[dh]>",
+                options: [.dotMatchesLineSeparators, .caseInsensitive])
+        else { return html }
+        let source = html as NSString
+        var result = ""
+        var cursor = 0
+        for match in table.matches(in: html, range: NSRange(location: 0, length: source.length)) {
+            result += source.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+            cursor = match.range.location + match.range.length
+            let body = source.substring(with: match.range)
+            var numeric = 0
+            var total = 0
+            for found in cell.matches(in: body, range: NSRange(location: 0, length: (body as NSString).length)) {
+                let raw = (body as NSString).substring(with: found.range(at: 1))
+                let text = DescriptionOfBusinessExtractor.htmlToText(raw)
+                guard !text.isEmpty else { continue }
+                total += 1
+                let digits = text.filter { $0.isNumber || ",.△▲-−%() ".contains($0) }.count
+                if digits == text.count { numeric += 1 }
+            }
+            if total > 0, numeric * 2 < total { result += body } else { result += " " }
+        }
+        result += source.substring(from: cursor)
+        return result
+    }
 }
 
 /// 指定 local tag の TextBlock 要素のインナーコンテンツを全件収集する。

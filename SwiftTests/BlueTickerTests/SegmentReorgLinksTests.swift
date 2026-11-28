@@ -170,3 +170,16 @@ private actor ReorgAnswers: SegmentReorgDeciding {
         #expect(try stripped(plain) == stripped(judged))
     }
 }
+
+@Suite struct SegmentNoteTableTests {
+    @Test func keepsTextTablesAndDropsNumericOnes() {
+        let html = """
+            <p>報告セグメント</p>
+            <table><tr><td>通信事業</td><td>携帯電話の販売</td></tr></table>
+            <table><tr><td>通信事業</td><td>1,234</td></tr><tr><td>合計</td><td>5,678</td></tr></table>
+            """
+        let text = BreakdownExtractor.textOnlyTables(html)
+        #expect(text.contains("携帯電話の販売"))
+        #expect(!text.contains("1,234"))
+    }
+}

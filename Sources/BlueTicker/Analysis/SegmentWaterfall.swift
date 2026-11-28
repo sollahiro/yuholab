@@ -412,8 +412,12 @@ public enum SegmentWaterfall {
         }
         let newKeys = Set(payload.rows.filter { $0.rowKind == "segment" }.compactMap(\.segmentKey))
         let askedKeys = regroups.flatMap(\.fromKeys).filter { !newKeys.contains($0) }
+        // 売上が無い・0 の旧区分は移り先を聞いても意味がない。移り先の候補は売上のある新区分で、同じ名前は 1 つにする。
         let old = askedKeys.compactMap { segment($0, previous.payload.rows) }
+            .filter { ($0.sales ?? 0) > 0 }
+        var seenLabels: Set<String> = []
         let new = regroups.flatMap(\.toKeys).compactMap { segment($0, payload.rows) }
+            .filter { ($0.sales ?? 0) > 0 && seenLabels.insert($0.label).inserted }
         guard !old.isEmpty, new.count >= 2 else { return nil }
         let allOld = groups.flatMap(\.fromKeys).compactMap { segment($0, previous.payload.rows) }
         return SegmentReorgQuestion(fyEnd: fyEnd, old: old, new: new, allOld: allOld)
