@@ -467,7 +467,9 @@ public func apiSkillsCatalog() -> [ApiSkill] {
                 年に再編があれば reorgs[]（kind は merge / split / replace / regroup、from は前年に開示された
                 旧区分、to は当年の新区分、from_total / to_total は各側の合計）が付き、新区分の行の
                 prior.from に旧区分の segment_key が入る。旧→新の対応は旧 k・新 1（merge）と旧 1・新 n（split）だけ
-                決める。複数対複数（regroup）は対応を決めず全行を並べる。終了・新規だけの年は reorgs を出さない。
+                決める。複数対複数（regroup）は組では全行を並べる。終了・新規だけの年は reorgs を出さない。
+                旧も新も複数の年で移り先が分かる行は reorg_links[]（from / to は segment_key、basis は
+                same_key / name）に出す。多対多で、組をまたぐことがある。載らない行の移り先は分からない。
                 metric は external_sales / profit / segment_assets / capital_expenditures /
                 noncurrent_asset_additions（省略時 external_sales）。
                 key または segment_key を付けるとそのキーの系列（rename でキーが変わった年も含む）。
@@ -566,6 +568,8 @@ public func apiSkillsCatalog() -> [ApiSkill] {
             instructions: """
                 単年の表は get-breakdown?axis=geography。格納済みデータのみ。未算出は 404、DB 非接続は 503。
                 直近の有報の状態は 200 の latest_status（ok / 省略の理由 / same_as_segment＝セグメント情報に同じとして省略 / unavailable）と、404 の reason で返す。
+                years の範囲は最新の年から数えた会計年度です。範囲内で地域別が無い年は years[] に入れず、
+                missing_years[]（fy_end / fiscal_year / doc_id / sales＝連結売上高）に出します。
                 例: GET /v1/companies/7203/waterfall/geography
                 例: GET /v1/companies/7203/waterfall/geography?fiscal_year=2026
                 """

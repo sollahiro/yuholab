@@ -76,6 +76,24 @@ public enum GeographyWaterfall {
         return ["code": code, "axis": breakdownAxisGeography, "years": objects]
     }
 
+    /// 最新の年（`covered` の最大）から数えて `limit` 会計年度の範囲で、地域別が無く売上高がある年。新しい順。
+    public static func missingYears(
+        covered: Set<Int>, sales: [(fyEnd: String, docID: String?, sales: Double)], limit: Int
+    ) -> [[String: Any]] {
+        guard let newest = covered.max() else { return [] }
+        var seen = covered
+        return sales.sorted { $0.fyEnd > $1.fyEnd }.compactMap { year -> [String: Any]? in
+            guard let fy = SegmentWaterfall.fiscalYear(fyEnd: year.fyEnd),
+                fy < newest, newest - fy < limit, seen.insert(fy).inserted
+            else { return nil }
+            var object: [String: Any] = [
+                "fy_end": year.fyEnd, "fiscal_year": fy, "sales": breakdownJSONAmount(year.sales),
+            ]
+            if let docID = year.docID { object["doc_id"] = docID }
+            return object
+        }
+    }
+
     // MARK: - 行の取り出し
 
     static func regions(of payload: BreakdownSnapshotPayload) -> [Region] {

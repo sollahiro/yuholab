@@ -34,7 +34,7 @@ enum BreakdownBuilder {
                     || (year.lineCut == true && items.contains { $0.link == .none }))
             return BreakdownColumnInput(
                 label: columnLabel(year), items: items, groups: index == 0 ? [] : groups(year),
-                reorged: reorged)
+                links: index == 0 ? [] : links(year), reorged: reorged)
         }
     }
 
@@ -45,6 +45,14 @@ enum BreakdownBuilder {
             let to = (reorg.to ?? []).compactMap(\.segmentKey)
             guard !from.isEmpty, !to.isEmpty else { return nil }
             return BreakdownReorgGroup(fromKeys: from, toKeys: to, balanced: reorg.balanced == true)
+        }
+    }
+
+    /// API の `reorg_links[]`（複数対複数の再編で、どの旧区分がどの新区分へ移ったか）。
+    private static func links(_ year: SegmentWaterfallResponse.Year) -> [BreakdownReorgLink] {
+        (year.reorgLinks ?? []).compactMap { link in
+            guard let from = link.from, let to = link.to else { return nil }
+            return BreakdownReorgLink(fromKey: from, toKey: to)
         }
     }
 
@@ -164,51 +172,35 @@ enum BreakdownBuilder {
     /// 同じ `comparable_group` の年どうしは、塊の共通のキー（`comparable_regions`）でつなぐ。
     /// 塊が変わる年はその年に `reorged` を立てる（年ラベルの下に「再編」）。塊が変わっても、
     /// 同じキーで構成する地域（`members`）まで同じ行は前年とつなぐ（日本などは再編の影響を受けない）。
-    /// 地域別が取れていない年（取れた年の間と、取れた最古の年から最新の年までの範囲）。
-    struct GapYear {
-        var fiscalYear: Int
-        var fyEnd: String
-        /// その年の売上高（連結合計）。
-        var total: Double
-    }
-
-    /// `gaps` は、地域別が取れていない年を灰色の 1 本の棒（その年の売上高）で埋めるための候補。
-    /// 取れた年の最古から最新の範囲にある年だけを使い、範囲の外は足さない。
     static func geographyColumns(
         _ response: GeographyWaterfallResponse,
-        gaps: [GapYear] = [],
         columnLabel: (GeographyWaterfallResponse.Year) -> String
     ) -> [BreakdownColumnInput] {
-        let columns = geographyYearColumns(response, columnLabel: columnLabel)
-        let fiscalYears = columns.map(\.fiscalYear)
-        guard let oldest = fiscalYears.min(), let newest = fiscalYears.max(), !gaps.isEmpty else {
-            return columns.map(\.column)
-        }
-        let present = Set(fiscalYears)
-        let gapColumns = gaps.filter {
-            $0.fiscalYear > oldest && $0.fiscalYear < newest && !present.contains($0.fiscalYear) && $0.total > 0
-        }.map { gap in
-            (
-                fiscalYear: gap.fiscalYear,
-                column: BreakdownColumnInput(
-                    label: columnLabel(GeographyWaterfallResponse.Year(fyEnd: gap.fyEnd, fiscalYear: gap.fiscalYear)),
-                    items: [
-                        BreakdownItemInput(
-                            key: missingRegionKey, label: "地域別なし", value: gap.total, link: .none)
-                    ])
-            )
-        }
-        return (columns + gapColumns).sorted { $0.fiscalYear < $1.fiscalYear }.map(\.column)
-    }
-
-    private static func geographyYearColumns(
-        _ response: GeographyWaterfallResponse,
-        columnLabel: (GeographyWaterfallResponse.Year) -> String
-    ) -> [(fiscalYear: Int, column: BreakdownColumnInput)] {
-        var columns: [(fiscalYear: Int, column: BreakdownColumnInput)] = []
+        var columns: [BreakdownColumnInput] = []
         var previousGroup: Int?
         var previousMembers: [String: [String]?] = [:]
+        // 地域別が無い年は、連結売上高の 1 本を決算期末の順に挟む（古い順）。
+        var missing = (response.missingYears ?? [])
+            .compactMap { year -> (fyEnd: String, sales: Double)? in
+                guard let fyEnd = year.fyEnd, let sales = year.sales, sales > 0 else { return nil }
+                return (fyEnd, sales)
+            }
+            .sorted { $0.fyEnd < $1.fyEnd }
+        func appendMissing(before fyEnd: String?) {
+            while let next = missing.first, fyEnd.map({ next.fyEnd < $0 }) ?? true {
+                missing.removeFirst()
+                let stub = GeographyWaterfallResponse.Year(fyEnd: next.fyEnd)
+                columns.append(
+                    BreakdownColumnInput(
+                        label: columnLabel(stub),
+                        items: [
+                            BreakdownItemInput(
+                                key: missingRegionKey, label: "地域別なし", value: next.sales, link: .none)
+                        ]))
+            }
+        }
         for year in response.years.reversed() {
+            appendMissing(before: year.fyEnd)
             let blocks = year.comparableRegions ?? []
             guard !blocks.isEmpty else { continue }
             let group = year.comparableGroup
@@ -228,16 +220,17 @@ enum BreakdownBuilder {
                     key: block.region, label: regionLabel(block, in: year), value: value, link: link)
             }
             guard !items.isEmpty else { continue }
-            let fiscalYear = year.fiscalYear ?? year.fyEnd.flatMap { Int($0.prefix(4)) } ?? 0
+            // 抜けた年をはさむと塊の番号は必ず変わるので、区分が違うときだけ「再編」にする。
+            let afterGap = columns.last?.isMissingYear == true
+            let reorged =
+                previousGroup != nil && !sameGroup
+                && !(afterGap && Set(previousMembers.keys) == Set(members.keys))
             columns.append(
-                (
-                    fiscalYear,
-                    BreakdownColumnInput(
-                        label: columnLabel(year), items: items, reorged: previousGroup != nil && !sameGroup)
-                ))
+                BreakdownColumnInput(label: columnLabel(year), items: items, reorged: reorged))
             previousGroup = group
             previousMembers = members
         }
+        appendMissing(before: nil)
         return columns
     }
 

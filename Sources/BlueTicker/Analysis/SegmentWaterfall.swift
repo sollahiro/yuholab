@@ -92,6 +92,12 @@ public enum SegmentWaterfall {
         if !reorgGroups.isEmpty {
             object[segmentWaterfallReorgsKey] = reorgGroups.map(\.json)
         }
+        let links = reorgLinks(groups: reorgGroups, previous: previous?.payload, payload: payload)
+        if !links.isEmpty {
+            object[segmentWaterfallReorgLinksKey] = links.map {
+                ["from": $0.fromKey, "to": $0.toKey, "basis": $0.basis]
+            }
+        }
 
         if seriesKeys == nil {
             let adjustments = items.filter { $0.row.rowKind == "reconciling" }.map(\.item)
@@ -345,6 +351,25 @@ public enum SegmentWaterfall {
                 from: gone.filter { part.from.contains($0.key) },
                 to: added.filter { part.to.contains($0.key) }, balanced: true)
         }
+    }
+
+    /// 旧も新も複数の再編があった年の、旧区分 → 新区分の組。金額で分けた組をまたいで結ぶため、
+    /// その年の全部の組の旧区分と新区分から決める。split / merge / replace だけの年は組で対応が分かるので返さない。
+    static func reorgLinks(
+        groups: [ReorgGroup], previous: BreakdownSnapshotPayload?, payload: BreakdownSnapshotPayload
+    ) -> [SegmentReorgLink] {
+        guard let previous else { return [] }
+        let fromKeys = groups.flatMap(\.fromKeys)
+        let toKeys = groups.flatMap(\.toKeys)
+        // 年全体で旧か新が 1 区分なら、対応はもう決まっている。
+        guard Set(fromKeys).count > 1, Set(toKeys).count > 1 else { return [] }
+        func labeled(_ keys: [String], _ rows: [BreakdownRowPayload]) -> [(key: String, label: String)] {
+            keys.compactMap { key in
+                rows.first { $0.rowKind == "segment" && $0.segmentKey == key }.map { (key, $0.label) }
+            }
+        }
+        return SegmentReorgLinks.deterministic(
+            from: labeled(fromKeys, previous.rows), to: labeled(toKeys, payload.rows))
     }
 
     /// regroup を、旧の合計と新の合計が近い部分集合の組に分ける。

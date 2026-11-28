@@ -207,10 +207,19 @@ public let segmentWaterfallPriorFromKey = "from"
 public let segmentTransitionMatchedRestated = "restated"
 /// 年の再編の組（旧区分 → 新区分）。再編が無い年は出さない。
 public let segmentWaterfallReorgsKey = "reorgs"
+/// 地域別の年次推移で、範囲の中の地域別が無い年と、その年の連結売上高。
+public let geographyWaterfallMissingYearsKey = "missing_years"
 public let segmentWaterfallReorgKindReplace = "replace"
 public let segmentWaterfallReorgKindMerge = "merge"
 public let segmentWaterfallReorgKindSplit = "split"
 public let segmentWaterfallReorgKindRegroup = "regroup"
+/// 複数対複数の再編で、どの旧区分がどの新区分へ移ったかの組（年の `reorg_links[]`）。多対多で、
+/// regroup を分けた組をまたぐこともある。対応を決められない行は載せない。
+public let segmentWaterfallReorgLinksKey = "reorg_links"
+/// 旧と新が同じ segment_key（前期列が組み替えられた同キーの区分）。
+public let segmentWaterfallReorgLinkBasisSameKey = segmentTransitionMatchedSameKey
+/// 区分名の「・」などで区切った要素が一致する（通信 → 通信・エネルギー）。
+public let segmentWaterfallReorgLinkBasisName = "name"
 public let segmentWaterfallSegmentsKey = "segments"
 public let segmentWaterfallAdjustmentKey = "adjustment"
 public let segmentWaterfallAdjustmentsKey = "adjustments"

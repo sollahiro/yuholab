@@ -341,36 +341,6 @@ import Testing
         #expect(layout.series.count == 2)
     }
 
-    // 酉島 6363: 23/03・24/03 の地域別が取れていない。取れた年の間は、その年の売上高を灰色の 1 本で埋める。
-    @Test func geographyGapYearsAreFilledWithAGrayTotalBar() throws {
-        let json = """
-            {"years":[
-             {"fy_end":"2026-03-31","comparable_group":0,"line_cut":false,
-              "comparable_regions":[{"region":"japan","value":100},{"region":"asia","value":50}]},
-             {"fy_end":"2025-03-31","comparable_group":0,"line_cut":true,
-              "comparable_regions":[{"region":"japan","value":90},{"region":"asia","value":40}]},
-             {"fy_end":"2022-03-31","comparable_group":1,"line_cut":false,
-              "comparable_regions":[{"region":"japan","value":70},{"region":"asia","value":30}]}]}
-            """
-        let response = try JSONDecoder().decode(GeographyWaterfallResponse.self, from: Data(json.utf8))
-        let gaps = [
-            BreakdownBuilder.GapYear(fiscalYear: 2024, fyEnd: "2024-03-31", total: 810),
-            BreakdownBuilder.GapYear(fiscalYear: 2023, fyEnd: "2023-03-31", total: 646),
-            BreakdownBuilder.GapYear(fiscalYear: 2021, fyEnd: "2021-03-31", total: 508),  // 範囲の外
-            BreakdownBuilder.GapYear(fiscalYear: 2025, fyEnd: "2025-03-31", total: 865),  // 取れた年は足さない
-        ]
-        let cols = BreakdownBuilder.geographyColumns(response, gaps: gaps) { $0.fyEnd ?? "" }
-        #expect(cols.map(\.label) == ["2022-03-31", "2023-03-31", "2024-03-31", "2025-03-31", "2026-03-31"])
-        #expect(cols[1].items.map(\.key) == [missingRegionKey])
-        #expect(cols[1].items.first?.value == 646)
-        let layout = StackedLayout.make(columns: cols)
-        // 灰色（系列の色なし）の棒で、印は「未取得」。実データの系列の数には数えない。
-        #expect(layout.bars[1].first?.colorIndex == -1)
-        #expect(layout.bars[1].first?.mark == BreakdownMark.missing)
-        #expect(layout.bars[2].first?.mark == BreakdownMark.missing)
-        #expect(layout.bars[0].count == 2)
-    }
-
     // U-NEXT HD 9418: 25/08 の再編（旧5→新4）を API が 3 組（通信＋エネ→通信・エネ＋金融、コンテンツ、店舗＋業務用→店舗・施設）に分けたとき、
     // 旧区分も最新期の大きい順（通信・エネルギー、コンテンツ、店舗・施設、金融）の位置に積み、行き先と同じ色にする。
     @Test func reorgGroupsStackOldSegmentsAtTheirDestinations() {

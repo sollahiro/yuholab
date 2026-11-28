@@ -30,13 +30,24 @@ struct BreakdownReorgGroup: Equatable {
     var isRegroup: Bool { fromKeys.count > 1 && toKeys.count > 1 }
 }
 
+/// 複数対複数の再編で分かっている、旧区分 → 新区分の移り先（API の `reorg_links[]`）。多対多。
+struct BreakdownReorgLink: Equatable {
+    var fromKey: String
+    var toKey: String
+}
+
 struct BreakdownColumnInput: Equatable {
     var label: String
     var items: [BreakdownItemInput]
     /// 前の列からこの列への再編。
     var groups: [BreakdownReorgGroup] = []
+    /// 前の列の区分の移り先。
+    var links: [BreakdownReorgLink] = []
     /// この年に区分の再編があった（年ラベルの下に小さく「再編」を出す）。1 本に集約した再編も含む。
     var reorged: Bool = false
+
+    /// 地域別が無く、連結売上高だけの年。
+    var isMissingYear: Bool { items.count == 1 && items.first?.key == missingRegionKey }
 }
 
 /// 棒の中に出す文字の元。
@@ -91,11 +102,10 @@ struct BreakdownLayout: Equatable {
 
 /// 報告セグメントが無い年（単一セグメント）の棒のキー。系列の色は付けない。
 let singleSegmentKey = "single|total"
-/// 地域別が取れていない年（売上高 1 本）の棒のキー。系列の色は付けない。
+/// 地域別が無い年の、連結売上高 1 本の棒。
 let missingRegionKey = "missing|total"
-
-/// 系列の色を持たない棒（単一セグメント・地域別が取れていない年）。
-func isNeutralBarKey(_ key: String) -> Bool { key == singleSegmentKey || key == missingRegionKey }
+/// 系列の色も積み順も持たない棒。
+private let neutralKeys: Set<String> = [singleSegmentKey, missingRegionKey]
 
 enum StackedLayout {
     static let barWidthRatio = 0.6
@@ -179,7 +189,7 @@ enum StackedLayout {
         var position: [String: Int] = [:]
         var palette = 0
         for seen in ordered {
-            if isNeutralBarKey(seen.id) {
+            if neutralKeys.contains(seen.id) {
                 position[seen.id] = -1
             } else {
                 position[seen.id] = palette
@@ -195,7 +205,7 @@ enum StackedLayout {
             return root
         }
         for k in stride(from: n - 1, through: 1, by: -1) {
-            for group in columns[k].groups {
+            for group in columns[k].groups where !group.isRegroup || group.balanced {
                 func ids(_ keys: [String], _ column: Int) -> [String] {
                     keys.compactMap { key in
                         items[column].first { $0.key == key }.flatMap { seriesIDs[column][$0.key] }
@@ -207,10 +217,9 @@ enum StackedLayout {
                 let from = ids(group.fromKeys, k - 1).sorted { value($0, k - 1) > value($1, k - 1) }
                 let to = ids(group.toKeys, k).sorted { value($0, k) > value($1, k) }
                 guard !to.isEmpty else { continue }
-                // 旧も新も複数（regroup）は対応が決まらない。新区分の 1 つが組の大部分（75% 以上）を占めるときだけ、
-                // 旧区分の全部をその色にそろえる（通信＋エネルギー→通信・エネルギー＋小さな金融）。
+                // 旧も新も複数（regroup）は対応が決まらない。値で分けた組（balanced）で、新区分の 1 つが組の大部分
+                // （75% 以上）を占めるときだけ、旧区分の全部をその色にそろえる（通信＋エネルギー→通信・エネルギー＋小さな金融）。
                 if group.isRegroup {
-                    guard group.balanced else { continue }
                     let total = to.reduce(0.0) { $0 + value($1, k) }
                     guard total > 0, value(to[0], k) / total >= regroupDominantShare else { continue }
                     for id in from where position[id] != -1 {
@@ -227,6 +236,21 @@ enum StackedLayout {
                 }
             }
         }
+        // 移り先が分かる旧区分は、いちばん大きい移り先の色にそろえる。
+        for k in stride(from: n - 1, through: 1, by: -1) {
+            let linksByFrom = Dictionary(grouping: columns[k].links, by: \.fromKey)
+            for (fromKey, links) in linksByFrom.sorted(by: { $0.key < $1.key }) {
+                guard let source = seriesIDs[k - 1][fromKey], position[source] != -1 else { continue }
+                let targets = items[k].filter { item in links.contains { $0.toKey == item.key } }
+                guard let largest = targets.max(by: { $0.value < $1.value }),
+                    let target = seriesIDs[k][largest.key]
+                else { continue }
+                let (from, to) = (colorRoot(source), colorRoot(target))
+                if from != to { colorParent[from] = to }
+            }
+        }
+        // 最新の列（凡例）にある色の組。それ以外の組は、移り先の分からない区分の色が凡例と紛れないよう別の色にする。
+        let latestRoots = Set(items[n - 1].map { colorRoot(seriesIDs[n - 1][$0.key] ?? $0.key) })
         // 色の組どうしが同じ列に並ぶときは別の色にする（系列が多い会社でパレットを一周して、同じ棒の中や凡例で色がかぶらないように）。
         var coexisting: [String: Set<String>] = [:]
         for k in 0..<n {
@@ -235,10 +259,12 @@ enum StackedLayout {
         }
         var rootColor: [String: Int] = [:]
         var colorUse = Array(repeating: 0, count: paletteSize)
-        for seen in ordered where !isNeutralBarKey(seen.id) {
+        for seen in ordered where !neutralKeys.contains(seen.id) {
             let root = colorRoot(seen.id)
             guard rootColor[root] == nil else { continue }
-            let taken = Set((coexisting[root] ?? []).compactMap { rootColor[$0] })
+            var others = coexisting[root] ?? []
+            if !latestRoots.contains(root) { others.formUnion(latestRoots) }
+            let taken = Set(others.compactMap { rootColor[$0] })
             // 空きがあれば最小の番号、無ければ（1 列に paletteSize より多いとき）使用が少ない色。
             let free = (0..<paletteSize).first { !taken.contains($0) }
                 ?? (0..<paletteSize).min { colorUse[$0] < colorUse[$1] } ?? 0
@@ -247,7 +273,7 @@ enum StackedLayout {
         }
         var colorIndex: [String: Int] = [:]
         for seen in ordered {
-            colorIndex[seen.id] = isNeutralBarKey(seen.id) ? -1 : (rootColor[colorRoot(seen.id)] ?? 0)
+            colorIndex[seen.id] = neutralKeys.contains(seen.id) ? -1 : (rootColor[colorRoot(seen.id)] ?? 0)
         }
         let series = ordered.map {
             BreakdownSeries(id: $0.id, label: $0.label, colorIndex: colorIndex[$0.id] ?? 0)
@@ -271,7 +297,7 @@ enum StackedLayout {
             }
         }
         var marks: [[String: BreakdownMark]] = Array(repeating: [:], count: n)
-        for k in 1..<n {
+        for k in 1..<n where !columns[k].isMissingYear && !columns[k - 1].isMissingYear {
             let hasReorg = items[k].contains { $0.link == .reorg && !groupedTo[k].contains($0.key) }
             var referenced = Set<String>()
             for item in items[k] {
@@ -303,13 +329,26 @@ enum StackedLayout {
             for (rank, item) in bySize.enumerated() {
                 // 位置の差が付くよう、つながり先の位置を整数、同じ先の中の大きい順を小数で足す。
                 let own = Double(rank) / 1000
-                guard k + 1 < n else { slot[item.key] = Double(rank); continue }
-                let next = stacked[k + 1]
+                // 地域別が無い年は飛ばして、その次の年の並びに合わせる。
+                guard let after = (k + 1..<n).first(where: { !columns[$0].isMissingYear }) else {
+                    slot[item.key] = Double(rank)
+                    continue
+                }
+                let next = stacked[after]
                 var targets: [Int] = []
                 for (index, candidate) in next.enumerated() {
                     if case .connect(let from) = candidate.link, from == item.key { targets.append(index) }
                 }
-                for group in columns[k + 1].groups where group.fromKeys.contains(item.key) {
+                // 移り先が分かる年は、その組だけに位置を合わせる。分からない行は組の全部には寄せない。
+                let links = columns[after].links
+                for (index, candidate) in next.enumerated()
+                where links.contains(where: { $0.fromKey == item.key && $0.toKey == candidate.key }) {
+                    targets.append(index)
+                }
+                for group in columns[after].groups
+                where group.fromKeys.contains(item.key) && !(group.isRegroup && !group.balanced && !links.isEmpty) {
+                    // 移り先が分かっている行は、金額で分けた組の相手には寄せない。
+                    guard !links.contains(where: { $0.fromKey == item.key }) else { continue }
                     for (index, candidate) in next.enumerated() where group.toKeys.contains(candidate.key) {
                         targets.append(index)
                     }

@@ -901,6 +901,14 @@ import Testing
         #expect(year[segmentWaterfallLineCutKey] as? Bool == true)
     }
 
+    @Test func regroupYearCarriesNameLinks() throws {
+        let year = try object(
+            old: [row("Tel", "通信事業", 100), row("Biz", "業務用システム事業", 50)],
+            new: [row("TelEne", "通信・エネルギー事業", 90), row("Fin", "金融事業", 60)])
+        let links = try #require(year[segmentWaterfallReorgLinksKey] as? [[String: String]])
+        #expect(links == [["from": "E1:ext:Tel", "to": "E1:ext:TelEne", "basis": "name"]])
+    }
+
     @Test func oneIntoTwoIsSplitAndTwoByTwoIsRegroup() throws {
         let split = try object(
             old: [row("A", "A", 100)], new: [row("B", "B", 60), row("C", "C", 40)])

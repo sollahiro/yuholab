@@ -49,7 +49,7 @@ struct BreakdownModel {
     var regionIsSegment = false
 
     /// 直近 5 年（取れる分だけ）。
-    static let years = 5
+    static let years = APIClient.breakdownYears
 
     /// 失敗や 404 はカードを出さないだけ（分析ページ全体のエラーにしない）。
     /// 取れたところから `update` で順に渡す（セグメントの棒 → 利益 → 地域）。全部そろうのを待たない。
@@ -95,7 +95,7 @@ struct BreakdownModel {
         guard latest.items.count >= 2 else {
             await loadSingleSegment(
                 latestGeographyMissing: (await regionResult).missingReason,
-                regionWaterfall: (await regionResult).response, segmentWaterfall: waterfall, update: update)
+                regionWaterfall: (await regionResult).response, update: update)
             return (await regionResult).missingReason
         }
         let layout = StackedLayout.make(columns: columns)
@@ -125,9 +125,7 @@ struct BreakdownModel {
         } else if !geographic {
             if let response = (await regionResult).response,
                 let model = regionModel(
-                    columns: BreakdownBuilder.geographyColumns(response, gaps: gapYears(waterfall)) {
-                        Format.fy($0.fyEnd)
-                    })
+                    columns: BreakdownBuilder.geographyColumns(response) { Format.fy($0.fyEnd) })
             {
                 region = model
             } else {
@@ -147,28 +145,15 @@ struct BreakdownModel {
     /// 単一セグメントの会社: 「単一セグメント」のカードを出し、地域は取れれば続けて出す。
     private static func loadSingleSegment(
         latestGeographyMissing: String?, regionWaterfall: GeographyWaterfallResponse?,
-        segmentWaterfall: SegmentWaterfallResponse? = nil,
         update: @MainActor (BreakdownModel) -> Void
     ) async {
         await update(BreakdownModel(segment: nil, region: nil, singleSegment: true))
         // 直近の有報の地域別が省略・未取得なら、古い年の地域カードは出さない。
         guard latestGeographyMissing == nil else { return }
         if let response = regionWaterfall,
-            let region = regionModel(
-                columns: BreakdownBuilder.geographyColumns(
-                    response, gaps: segmentWaterfall.map(gapYears) ?? []
-                ) { Format.fy($0.fyEnd) })
+            let region = regionModel(columns: BreakdownBuilder.geographyColumns(response) { Format.fy($0.fyEnd) })
         {
             await update(BreakdownModel(segment: nil, region: region, singleSegment: true))
-        }
-    }
-
-    /// 地域別が取れていない年を灰色の棒で埋めるための、年ごとの売上高（連結合計。無ければセグメントの合計）。
-    private static func gapYears(_ waterfall: SegmentWaterfallResponse) -> [BreakdownBuilder.GapYear] {
-        waterfall.years.compactMap { year in
-            guard let fyEnd = year.fyEnd, let fiscalYear = year.fiscalYear ?? Int(fyEnd.prefix(4)) else { return nil }
-            let total = year.consolidated?.value ?? year.segments.compactMap(\.value).reduce(0, +)
-            return total > 0 ? BreakdownBuilder.GapYear(fiscalYear: fiscalYear, fyEnd: fyEnd, total: total) : nil
         }
     }
 
@@ -355,6 +340,9 @@ private struct RegionCard: View {
                 }
             }
             AnalysisNote(text: "棒は地域別売上高（\(model.layout.unitName)）。区分が前年と違う行の前年差は出しません。")
+            if model.columns.contains(where: \.isMissingYear) {
+                AnalysisNote(text: "灰色の棒は、地域別の内訳が無い年の連結売上高です。")
+            }
         }
     }
 }
