@@ -320,6 +320,11 @@ enum StatementFinancialsResolver {
         {
             values.geographyCoverageSales = topLine
             values.geographyCoverageSalesLabel = salesLabel
+        } else if !isBank, !isInsurance,
+                  let revenue = grossProfitComponentRevenue(year.incomeStatement, sales: sales)
+        {
+            values.geographyCoverageSales = revenue
+            values.geographyCoverageSalesLabel = salesLabel
         }
         values.cashAllocation = CashAllocationResolver.resolve(
             cashFlow: year.cashFlow, cfo: values.cfo, cfi: values.cfi, isBank: isBank)
@@ -853,6 +858,28 @@ enum StatementFinancialsResolver {
             return "営業収益"
         }
         return summaryLabel
+    }
+
+    /// 電通 4324（2020・2021）の PL は「売上高（注）」（NetSalesIFRS。取扱高ベースの参考行）が収益の上にあり、
+    /// 計算リンクの売上総利益は Revenue*（収益）− 原価。Summary sales が計算リンク外の NetSales* で、
+    /// 売上総利益の構成要素の Revenue* がそれより小さいときは、その Revenue* を geography のカバー判定の分母にする。
+    static func grossProfitComponentRevenue(
+        _ lines: [StatementLineItem], sales: Double?
+    ) -> Double? {
+        guard let sales, sales > 0 else { return nil }
+        guard let salesLine = lines.first(where: {
+            $0.tag.hasPrefix("NetSales") && abs($0.value - sales) < 0.5
+        }) else { return nil }
+        guard let gross = lines.first(where: { $0.tag.hasPrefix("GrossProfit") && $0.isTotal }),
+              let components = gross.components,
+              !components.contains(where: { $0.tag == salesLine.tag })
+        else { return nil }
+        let candidates = components.filter { $0.weight > 0 && $0.tag.hasPrefix("Revenue") }
+        guard candidates.count == 1,
+              let revenue = lines.first(where: { $0.tag == candidates[0].tag }),
+              revenue.value > 0, revenue.value < sales
+        else { return nil }
+        return revenue.value
     }
 
     /// 連結 PL のトップライン収益。営業利益行より上の収益行のうち、他の収益行の構成要素でない行の和。

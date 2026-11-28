@@ -1409,15 +1409,23 @@ enum BreakdownExtractor {
     /// 列が地域の売上表（見出し行に 日本/国内/本邦 の列があり、データ列が3つ以上）か。
     /// 有形固定資産の同形の表は、見出しと直前キャプションの除外で落とす（`mixedSkipNearestAssetCaptionTables`）。
     static func tableHasRegionColumnHeaders(_ table: BreakdownTable) -> Bool {
+        // 減損損失・のれん・償却の表は地域列でも売上ではない（5632 の近傍表）。
+        let nonSalesWords = ["減損", "のれん", "償却", "固定資産", "資産"]
+        let head = table.markdown.split(separator: "\n").prefix(8).joined()
+        if nonSalesWords.contains(where: head.contains) { return false }
         for line in table.markdown.split(separator: "\n", omittingEmptySubsequences: false) {
             let trimmed = String(line).trimmingCharacters(in: .whitespaces)
-            guard trimmed.hasPrefix("|") else { continue }
-            if trimmed.contains("---") { return false }
+            guard trimmed.hasPrefix("|"), !trimmed.contains("---") else { continue }
             let cells = trimmed.split(separator: "|", omittingEmptySubsequences: true)
                 .map { String($0).filter { !$0.isWhitespace } }
-            let dataColumns = cells.dropFirst().filter { !$0.isEmpty }
-            guard dataColumns.count >= 3 else { continue }
-            if dataColumns.contains(where: { ["日本", "国内", "本邦"].contains(where: $0.contains) }) {
+                .filter { !$0.isEmpty }
+            // 数値の行まで来たら見出しは終わり。
+            let numeric = cells.filter {
+                !$0.isEmpty && $0.allSatisfy { "0123456789,.△▲-−()".contains($0) }
+            }
+            if numeric.count >= 2 { return false }
+            guard cells.count >= 3 else { continue }
+            if cells.contains(where: { ["日本", "国内", "本邦"].contains(where: $0.contains) }) {
                 return true
             }
         }

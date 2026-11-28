@@ -1109,7 +1109,8 @@ enum GeographyBreakdownLLMNormalizer {
         guard let slash = compact.firstIndex(where: { $0 == "/" || $0 == "／" }) else { return nil }
         let parentPart = String(compact[..<slash])
         let childPart = String(compact[compact.index(after: slash)...])
-        guard !parentPart.isEmpty, !childPart.isEmpty else { return nil }
+        // 親は「その他」だけ（ORIX の「セグメント区分/…」見出しを親にしない）。
+        guard parentPart == "その他", !childPart.isEmpty else { return nil }
         guard let parentIdx = parentIndices.first(where: {
             $0 != excluding && compactGeographyLabel(rows[$0].labelRaw) == parentPart
                 && rows[$0].amount >= row.amount
